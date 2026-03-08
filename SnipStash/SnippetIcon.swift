@@ -80,10 +80,10 @@ struct SnippetIconShape: Shape {
         }
 
         // Heart cutout on cover (even-odd: shows menu bar through)
-        let heartSize = padWidth * 0.62
+        let heartSize = padWidth * 0.7
         let heartRect = CGRect(
             x: padX + (padWidth - heartSize) / 2,
-            y: padY + padHeight * 0.40,
+            y: padY + padHeight * 0.35,
             width: heartSize,
             height: heartSize
         )
