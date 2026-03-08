@@ -38,7 +38,7 @@ struct SnipStashApp: App {
         })
         .modelContainer(Self.sharedModelContainer)
 
-        Window("Snippet Editor", id: "editor") {
+        Window(editorStore.editorWindowTitle, id: "editor") {
             EditorWindowRoot()
                 .environmentObject(editorStore)
                 .environmentObject(snippetsStore)

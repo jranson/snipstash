@@ -1,32 +1,97 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 struct EditorWindowRoot: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var editorStore: EditorStore
     @EnvironmentObject private var snippetsStore: SnippetsStore
+    @AppStorage("muteQuickSaveSounds") private var muteSounds = false
+    @State private var escapeMonitor: Any? = nil
+    
+    private var isAnalyzeMode: Bool {
+        editorStore.editingSnippet == nil && editorStore.analyzeSessionId != nil
+    }
 
     var body: some View {
-        if let snippet = editorStore.editingSnippet {
-            SnippetEditorView(snippet: snippet) { body, title in
-                snippet.body = body
-                snippet.title = title
-                snippetsStore.refresh()
-                dismiss()
-            } onCancel: {
-                dismiss()
+        Group {
+            if let snippet = editorStore.editingSnippet {
+                SnippetEditorView(snippet: snippet, initialBody: nil, onSave: { body, title in
+                    saveSnippet(snippet: snippet, body: body, title: title)
+                    dismiss()
+                }, onSaveAndSetClipboard: { body, title in
+                    saveSnippet(snippet: snippet, body: body, title: title)
+                    setClipboardAndNotify(body)
+                    dismiss()
+                }, onCancel: {
+                    dismiss()
+                })
+                .id(snippet.id)
+            } else {
+                SnippetEditorView(snippet: nil, initialBody: editorStore.initialBody, onSave: { body, title in
+                    let new = Snippet(body: body, title: title, timestamp: Date())
+                    modelContext.insert(new)
+                    snippetsStore.refresh()
+                    dismiss()
+                }, onSaveAndSetClipboard: { body, title in
+                    let new = Snippet(body: body, title: title, timestamp: Date())
+                    modelContext.insert(new)
+                    snippetsStore.refresh()
+                    setClipboardAndNotify(body)
+                    dismiss()
+                }, onCancel: {
+                    dismiss()
+                })
+                .id(editorStore.analyzeSessionId?.uuidString ?? "new")
+                .onAppear {
+                    if editorStore.editingSnippet == nil {
+                        editorStore.initialBody = nil
+                    }
+                }
             }
-            .id(snippet.id)
-        } else {
-            SnippetEditorView(snippet: nil) { body, title in
-                let new = Snippet(body: body, title: title, timestamp: Date())
-                modelContext.insert(new)
-                snippetsStore.refresh()
-                dismiss()
-            } onCancel: {
-                dismiss()
+        }
+        .onAppear {
+            updateWindowTitle()
+            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                guard event.keyCode == 53 else { return event } // Escape
+                let t = NSApp.keyWindow?.title ?? ""
+                guard t == "Snippet Editor" || t == "Clipboard Analysis" else { return event }
+                Task { @MainActor in dismiss() }
+                return nil
             }
+        }
+        .onChange(of: editorStore.editingSnippet?.id) { _, _ in
+            updateWindowTitle()
+        }
+        .onChange(of: editorStore.analyzeSessionId) { _, _ in
+            updateWindowTitle()
+        }
+        .onDisappear {
+            if let m = escapeMonitor {
+                NSEvent.removeMonitor(m)
+                escapeMonitor = nil
+            }
+        }
+    }
+
+    private func saveSnippet(snippet: Snippet, body: String, title: String?) {
+        snippet.body = body
+        snippet.title = title
+        snippetsStore.refresh()
+    }
+
+    private func setClipboardAndNotify(_ string: String) {
+        _ = ClipboardIO.writeString(string)
+        ClipboardSound.playClipboardWritten(muted: muteSounds)
+    }
+
+    private func updateWindowTitle() {
+        let title = isAnalyzeMode ? "Clipboard Analysis" : "Snippet Editor"
+        editorStore.editorWindowTitle = title
+        DispatchQueue.main.async {
+            NSApp.keyWindow?.title = title
+            NSApp.mainWindow?.title = title
         }
     }
 }

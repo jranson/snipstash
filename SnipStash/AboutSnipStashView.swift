@@ -4,9 +4,12 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct AboutSnipStashView: View {
     private let githubURL = URL(string: "https://github.com/centennial-oss/snipstash")!
+    private static let windowTitle = "About SnipStash"
+    @State private var escapeMonitor: Any? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -80,7 +83,7 @@ struct AboutSnipStashView: View {
             HStack {
                 Spacer()
                 Button("Close") {
-                    NSApp.windows.first { $0.title == "About SnipStash" }?.close()
+                    closeAboutWindow()
                 }
                 .font(.system(size: 15))
                 .buttonStyle(.borderedProminent)
@@ -92,6 +95,28 @@ struct AboutSnipStashView: View {
         .padding(24)
         .padding(.leading, 10)
         .frame(width: 540, height: 560)
+        .onKeyPress(.escape) {
+            closeAboutWindow()
+            return .handled
+        }
+        .onAppear {
+            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                guard event.keyCode == 53 else { return event } // Escape
+                guard NSApp.keyWindow?.title == Self.windowTitle else { return event }
+                Task { @MainActor in closeAboutWindow() }
+                return nil
+            }
+        }
+        .onDisappear {
+            if let m = escapeMonitor {
+                NSEvent.removeMonitor(m)
+                escapeMonitor = nil
+            }
+        }
+    }
+
+    private func closeAboutWindow() {
+        NSApp.windows.first { $0.title == Self.windowTitle }?.close()
     }
 }
 

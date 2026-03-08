@@ -1,12 +1,12 @@
-# <img src="assets/app-icon-transparent.png" alt="SnipStash" height="48" /> SnipStash [<img align="right" src="assets/donwload-app-store.svg" />](https://apps.apple.com/us/app/snipstash/id6759918875)
+# <img src="assets/app-icon-transparent.png" alt="SnipStash" height="48" /> SnipStash [<img align="right" src="assets/download-app-store.svg" />](https://apps.apple.com/us/app/snipstash/id6759918875)
 
 A lightweight, open-source macOS Menu Bar-only app for quickly stashing and managing plaintext snippets via the clipboard.
 
-![SnipStash menu bar and dropdown showing snippets and context menu](assets/screenshot.png)
+SnipStash is [available in the App Store ](https://apps.apple.com/us/app/snipstash/id6759918875) or can be downloaded directly from [this project's releases](github.com/centennial-oss/snipstash/releases).
 
 ## Purpose
 
-SnipStash lives in your Menu Bar so you can capture, store, and recall text snippets without leaving your workflow. It's ideal for:
+SnipStash lives in your Menu Bar so you can capture, store, transform, and recall text snippets without leaving your workflow. It's ideal for:
 
 - Quick captures from the clipboard that you don't want to lose, like tracking numbers
 - Blocks of text you need to temporarily stash somewhere while rearranging code or a document
@@ -17,13 +17,27 @@ SnipStash lives in your Menu Bar so you can capture, store, and recall text snip
 ## Features
 
 - **Menu Bar access** — Runs only in the macOS Menu Bar for quick access
-- **Quick Save from Clipboard** — One-click to save the current clipboard contents to the stash
-- **Create & Edit** — Edit and manually create snippets with custom menu labels
+- **Capture Snippet from Clipboard** — One-click to save the current clipboard contents to the stash
+- **Create, Edit, and Arrange Snippets** — Edit and manually create snippets with custom menu labels
 - **Copy to clipboard** — Copy any snippet's content back to the clipboard
 - **Open URL** — Quickly open URL snippets from the Menu Bar
-- **Reorder Snippets** — Move snippets up or down to change their order
-- **Delete Snippets** — Remove snippets with confirmation (hold Option or Shift to skip confirmation)
 - **Persistent storage** — SnipStash data is stored locally with [SwiftData](https://developer.apple.com/documentation/swiftdata/)
+- **Transform Clipboard** - Developer-friendly one-click transformations like convert clipboard contents to lowercase, prettify/minify JSON, Base64-encode/decode, sort and de-duplicate lines, and more!
+- **Set Clipboard To** - One-click to set the clipboard contents to the current epoch timestamp or a new, random UUID.
+- **Analyze Clipboard** - Reveals the number of lines, words, characters and em dashes in the clipboard.
+
+## Screenshots
+
+<img src="assets/screenshot-open-url-snippet.png" alt="SnipStash menu with snippet submenu showing Copy to Clipboard, Open URL, Edit, Delete, Move Up, Move Down" width="875" />
+
+<img src="assets/screenshot-transform-sort-dedupe.png" alt="Transform Clipboard Data submenus: Casing & Spacing > Sort + Dedupe Lines" width="875" />
+
+<img src="assets/screenshot-transform-prettify.png" alt="Transform Clipboard Data submenus: Structured Data > JSON Prettify" width="875" />
+
+
+<img src="assets/screenshot-set-clipboard-current-time.png" alt="Set Clipboard Data submenu: > Current SQL DateTime" width="875" />
+
+<img src="assets/screenshot-clipboard-analysis.png" alt="Clipboard Analysis window showing text stats (chars, words, lines, em dashes) and Close / Edit Snippet buttons" width="875" />
 
 ## Privacy
 
@@ -33,8 +47,8 @@ SnipStash does not collect, send, or share your data. Everything stays on your M
 
 ## Requirements
 
-- macOS 26 or higher
-- Xcode (for building)
+- macOS 14 or higher
+- Xcode (for building locally)
 
 ## Building
 
