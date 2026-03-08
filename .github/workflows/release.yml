@@ -43,7 +43,7 @@ jobs:
 
       - name: Build SnipStash (macOS Apple Silicon)
         run: |
-          xcodebuild -scheme SnipStash \
+          xcodebuild -project SnipStash.xcodeproj -target SnipStash \
             -configuration Release \
             -derivedDataPath build \
             -destination 'platform=macOS,arch=arm64' \
