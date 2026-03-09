@@ -129,7 +129,7 @@ struct MenuBarView: View {
                 Button("CSV → JSON") { transformClipboardIfValid(ClipboardTransform.csvToJson) }
                 Divider()
                 Button("MySQL CLI Table → CSV") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToCsv) }
-                Button("psql Table → CSV") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToCsv) }
+                Button("psql Table → CSV") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToCsv) }
             }
             Menu("Multi-line Data") {
                 Button("Sort Lines") { transformClipboard(ClipboardTransform.sortLines) }
@@ -341,6 +341,10 @@ struct MenuBarView: View {
     }
 
     private func transformClipboardIfValid(_ transform: (String) -> String?) {
+        ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+    }
+
+    private func transformClipboardIfValid(_ transform: (String) throws -> String) {
         ClipboardTransform.applyIfValid(transform, muted: muteSounds)
     }
 

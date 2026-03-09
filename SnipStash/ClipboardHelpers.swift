@@ -52,6 +52,11 @@ enum ClipboardIO {
 
 @MainActor
 enum ClipboardTransform {
+    struct TransformError: LocalizedError, CustomStringConvertible {
+        let description: String
+        var errorDescription: String? { description }
+    }
+
     /// Read clipboard, apply transform, write back. Plays success or error sound.
     @discardableResult
     static func apply(_ transform: (String) -> String, muted: Bool) -> Bool {
@@ -85,6 +90,30 @@ enum ClipboardTransform {
         }
         ClipboardSound.playClipboardWritten(muted: muted)
         return true
+    }
+
+    /// Like applyIfValid, but captures typed transform errors so DEBUG builds can log the exact reason.
+    @discardableResult
+    static func applyIfValid(_ transform: (String) throws -> String, muted: Bool) -> Bool {
+        guard let str = ClipboardIO.readString() else {
+            ClipboardSound.playClipboardError(muted: muted)
+            return false
+        }
+        do {
+            let result = try transform(str)
+            guard ClipboardIO.writeString(result) else {
+                ClipboardSound.playClipboardError(muted: muted)
+                return false
+            }
+            ClipboardSound.playClipboardWritten(muted: muted)
+            return true
+        } catch {
+            #if DEBUG
+            print("[ClipboardTransform] \(error)")
+            #endif
+            ClipboardSound.playClipboardError(muted: muted)
+            return false
+        }
     }
 
     // MARK: - Case / whitespace (nonisolated so tests can call without main actor)
@@ -434,14 +463,16 @@ enum ClipboardTransform {
     }
 
     /// Convert JSON string to YAML-style output (indented key: value, list items with -).
-    nonisolated static func jsonToYaml(_ s: String) -> String? {
+    nonisolated static func jsonToYaml(_ s: String) throws -> String {
         guard let data = s.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
+              let json = try? JSONSerialization.jsonObject(with: data) else {
+            throw TransformError(description: "JSON → YAML failed: clipboard does not contain valid JSON.")
+        }
         return YAMLHelpers.emitYAML(json, indent: 0)
     }
 
     /// Convert YAML string to JSON. Minified YAML input → minified JSON; multi-line YAML → prettified JSON.
-    nonisolated static func yamlToJson(_ s: String) -> String? {
+    nonisolated static func yamlToJson(_ s: String) throws -> String {
         let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
         let isMinifiedInput = ((trimmed.hasPrefix("{") && trimmed.hasSuffix("}")) || (trimmed.hasPrefix("[") && trimmed.hasSuffix("]"))) && !trimmed.contains("\n")
 
@@ -451,20 +482,26 @@ enum ClipboardTransform {
         } else {
             obj = YAMLHelpers.parseYAML(s)
         }
-        guard let obj = obj else { return nil }
+        guard let obj = obj else {
+            throw TransformError(description: "YAML → JSON failed: clipboard does not contain parseable YAML.")
+        }
         let jsonObj = YAMLHelpers.anyToJSONCompatible(obj)
         let options: JSONSerialization.WritingOptions = isMinifiedInput ? [.sortedKeys] : [.prettyPrinted, .sortedKeys]
         guard let data = try? JSONSerialization.data(withJSONObject: jsonObj, options: options),
-              let out = String(data: data, encoding: .utf8) else { return nil }
+              let out = String(data: data, encoding: .utf8) else {
+            throw TransformError(description: "YAML → JSON failed: parsed YAML could not be encoded as JSON.")
+        }
         return out
     }
 
     // MARK: - CSV ↔ JSON
 
-    /// Parse CSV (first line = headers) and return JSON array of objects. Returns nil on empty/invalid.
-    nonisolated static func csvToJson(_ s: String) -> String? {
+    /// Parse CSV (first line = headers) and return JSON array of objects.
+    nonisolated static func csvToJson(_ s: String) throws -> String {
         let rows = parseCSVRows(s)
-        guard let first = rows.first, !first.isEmpty else { return nil }
+        guard let first = rows.first, !first.isEmpty else {
+            throw TransformError(description: "CSV → JSON failed: no CSV header row was found.")
+        }
         let headers = first
         let objects: [[String: String]] = rows.dropFirst().map { values in
             var dict: [String: String] = [:]
@@ -474,17 +511,23 @@ enum ClipboardTransform {
             return dict
         }
         guard let data = try? JSONSerialization.data(withJSONObject: objects, options: [.prettyPrinted]),
-              let out = String(data: data, encoding: .utf8) else { return nil }
+              let out = String(data: data, encoding: .utf8) else {
+            throw TransformError(description: "CSV → JSON failed: CSV rows could not be encoded as JSON.")
+        }
         return out
     }
 
     /// Parse JSON array of objects and output CSV with headers from first object keys.
-    nonisolated static func jsonArrayToCsv(_ s: String) -> String? {
+    nonisolated static func jsonArrayToCsv(_ s: String) throws -> String {
         guard let data = s.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-              !array.isEmpty else { return nil }
+              !array.isEmpty else {
+            throw TransformError(description: "JSON Array → CSV failed: clipboard must contain a non-empty JSON array of objects.")
+        }
         let keys: [String] = (array.first?.keys.map { $0 } ?? []).sorted()
-        guard !keys.isEmpty else { return nil }
+        guard !keys.isEmpty else {
+            throw TransformError(description: "JSON Array → CSV failed: the first object does not contain any keys.")
+        }
         func escape(_ v: String) -> String {
             if v.contains(",") || v.contains("\"") || v.contains("\n") {
                 return "\"" + v.replacingOccurrences(of: "\"", with: "\"\"") + "\""
@@ -500,25 +543,33 @@ enum ClipboardTransform {
 
     /// Convert MySQL CLI table output to CSV. Ignores any text before the first table border
     /// and after the last table border.
-    nonisolated static func mysqlCliTableToCsv(_ s: String) -> String? {
+    nonisolated static func mysqlCliTableToCsv(_ s: String) throws -> String {
         let lines = windowsNewlinesToUnix(s).components(separatedBy: .newlines)
         let borderIndices = lines.indices.filter { isMySQLCliTableBorder(lines[$0]) }
         guard let firstBorder = borderIndices.first,
               let lastBorder = borderIndices.last,
-              firstBorder < lastBorder else { return nil }
+              firstBorder < lastBorder else {
+            throw TransformError(description: "MySQL CLI Table → CSV failed: could not find a complete +--- table border block.")
+        }
 
         let tableLines = lines[firstBorder...lastBorder]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        guard tableLines.allSatisfy({ isMySQLCliTableBorder($0) || isMySQLCliTableRow($0) }) else { return nil }
+        guard tableLines.allSatisfy({ isMySQLCliTableBorder($0) || isMySQLCliTableRow($0) }) else {
+            throw TransformError(description: "MySQL CLI Table → CSV failed: found non-table text inside the detected table block.")
+        }
 
         let rows = tableLines
             .filter(isMySQLCliTableRow)
             .map(parseMySQLCliTableRow)
 
-        guard let headers = rows.first, !headers.isEmpty, rows.count >= 2 else { return nil }
-        guard rows.allSatisfy({ $0.count == headers.count }) else { return nil }
+        guard let headers = rows.first, !headers.isEmpty, rows.count >= 2 else {
+            throw TransformError(description: "MySQL CLI Table → CSV failed: expected a header row plus at least one data row.")
+        }
+        guard rows.allSatisfy({ $0.count == headers.count }) else {
+            throw TransformError(description: "MySQL CLI Table → CSV failed: one or more rows have a different number of columns than the header.")
+        }
 
         func escapeCSV(_ value: String) -> String {
             if value.contains(",") || value.contains("\"") || value.contains("\n") {
@@ -528,6 +579,51 @@ enum ClipboardTransform {
         }
 
         return rows.map { row in
+            row.map(escapeCSV).joined(separator: ",")
+        }.joined(separator: "\n")
+    }
+
+    /// Convert psql CLI table output to CSV. Expects trimmed table-only text with a header line,
+    /// a dashed separator line, and one or more data rows.
+    nonisolated static func psqlCliTableToCsv(_ s: String) throws -> String {
+        let lines = windowsNewlinesToUnix(s)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard let separatorIndex = lines.firstIndex(where: isPsqlCliTableSeparator),
+              separatorIndex > 0 else {
+            throw TransformError(description: "psql Table → CSV failed: could not find the dashed separator line under the header.")
+        }
+
+        let headerLine = lines[separatorIndex - 1]
+        let dataLines = lines[(separatorIndex + 1)...]
+            .filter { !isPsqlCliTableFooter($0) }
+        guard !dataLines.isEmpty else {
+            throw TransformError(description: "psql Table → CSV failed: found the header, but no data rows below it.")
+        }
+
+        let headers = parsePsqlCliTableRow(headerLine)
+        guard !headers.isEmpty else {
+            throw TransformError(description: "psql Table → CSV failed: header row did not contain any columns.")
+        }
+
+        let parsedDataRows = dataLines.map { line in
+            normalizePsqlCliTableRow(parsePsqlCliTableRow(line), headerCount: headers.count)
+        }
+        guard parsedDataRows.allSatisfy({ !$0.isEmpty && $0.count == headers.count }) else {
+            throw TransformError(description: "psql Table → CSV failed: one or more rows could not be aligned to the header column count.")
+        }
+
+        func escapeCSV(_ value: String) -> String {
+            if value.contains(",") || value.contains("\"") || value.contains("\n") {
+                return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+            }
+            return value
+        }
+
+        return ([headers] + parsedDataRows).map { row in
             row.map(escapeCSV).joined(separator: ",")
         }.joined(separator: "\n")
     }
@@ -601,6 +697,33 @@ enum ClipboardTransform {
         let parts = trimmed.split(separator: "|", omittingEmptySubsequences: false)
         guard parts.count >= 3 else { return [] }
         return parts.dropFirst().dropLast().map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    private nonisolated static func isPsqlCliTableSeparator(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: "+", omittingEmptySubsequences: false)
+        guard parts.count >= 2 else { return false }
+        return parts.allSatisfy { part in
+            !part.isEmpty && part.allSatisfy { $0 == "-" }
+        }
+    }
+
+    private nonisolated static func isPsqlCliTableFooter(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("("), trimmed.hasSuffix(")") else { return false }
+        let body = trimmed.dropFirst().dropLast()
+        return body.range(of: #"^\d+\s+rows?$"#, options: .regularExpression) != nil
+    }
+
+    private nonisolated static func parsePsqlCliTableRow(_ line: String) -> [String] {
+        line.split(separator: "|", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    private nonisolated static func normalizePsqlCliTableRow(_ row: [String], headerCount: Int) -> [String] {
+        guard !row.isEmpty, row.count <= headerCount else { return [] }
+        if row.count == headerCount { return row }
+        return row + Array(repeating: "", count: headerCount - row.count)
     }
 
     nonisolated static func parseCSVLine(_ line: String) -> [String] {

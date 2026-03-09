@@ -225,27 +225,23 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertTrue(result.contains("\n"), "output should be multi-line")
     }
 
-    func testJsonToYaml() {
+    func testJsonToYaml() throws {
         let json = "{\"name\":\"x\",\"count\":2}"
-        let yaml = ClipboardTransform.jsonToYaml(json)
-        XCTAssertNotNil(yaml)
-        XCTAssertTrue(yaml!.contains("name:"))
+        let yaml = try ClipboardTransform.jsonToYaml(json)
+        XCTAssertTrue(yaml.contains("name:"))
     }
 
     /// JSON string values that look like numbers (e.g. "2.8") must be emitted quoted in YAML so they stay strings.
-    func testJsonToYaml_preservesQuotedNumbersAsStrings() {
+    func testJsonToYaml_preservesQuotedNumbersAsStrings() throws {
         let minifiedJson = "{\"key5\":\"2.8\",\"key2\":false,\"key3\":1.7,\"key1\":\"value1\"}"
-        let yaml = ClipboardTransform.jsonToYaml(minifiedJson)
-        XCTAssertNotNil(yaml, "jsonToYaml should succeed")
-        guard let yaml = yaml else { return }
+        let yaml = try ClipboardTransform.jsonToYaml(minifiedJson)
         // key5 is a string "2.8" in JSON; YAML must quote it so it stays a string (key5: "2.8")
         XCTAssertTrue(yaml.contains("key5: \"2.8\""), "key5 string value 2.8 must be quoted in YAML; got: \(yaml)")
         // key3 is a number 1.7 in JSON; YAML should emit unquoted
         XCTAssertTrue(yaml.contains("key3: 1.7"), "key3 numeric value should be unquoted; got: \(yaml)")
         // Round-trip: YAML -> JSON should still have key5 as string
-        let backJson = ClipboardTransform.yamlToJson(yaml)
-        XCTAssertNotNil(backJson)
-        guard let data = backJson!.data(using: .utf8),
+        let backJson = try ClipboardTransform.yamlToJson(yaml)
+        guard let data = backJson.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             XCTFail("round-trip JSON should be valid")
             return
@@ -254,19 +250,17 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(obj["key3"] as? Double, 1.7, "key3 must remain a number")
     }
 
-    func testYamlToJson() {
+    func testYamlToJson() throws {
         let yaml = "a: 1\nb: 2"
-        let json = ClipboardTransform.yamlToJson(yaml)
-        XCTAssertNotNil(json)
-        XCTAssertTrue(json!.contains("a"))
+        let json = try ClipboardTransform.yamlToJson(yaml)
+        XCTAssertTrue(json.contains("a"))
     }
 
-    func testYamlToJson_minifiedYamlProducesMinifiedJson() {
+    func testYamlToJson_minifiedYamlProducesMinifiedJson() throws {
         let minifiedYaml = "{abcde: null, arrayObject: [red line, green, blue], key1: value1, key2: false, key3: '1.7', subObject: {key4: true}}"
-        let json = ClipboardTransform.yamlToJson(minifiedYaml)
-        XCTAssertNotNil(json)
-        XCTAssertFalse(json!.contains("\n"), "minified YAML input should produce single-line JSON")
-        guard let data = json!.data(using: .utf8),
+        let json = try ClipboardTransform.yamlToJson(minifiedYaml)
+        XCTAssertFalse(json.contains("\n"), "minified YAML input should produce single-line JSON")
+        guard let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             XCTFail("output should be valid JSON object")
             return
@@ -281,18 +275,16 @@ final class ClipboardHelpersTests: XCTestCase {
 
     // MARK: - CSV / JSON
 
-    func testCsvToJson() {
+    func testCsvToJson() throws {
         let csv = "a,b\n1,2\n3,4"
-        let json = ClipboardTransform.csvToJson(csv)
-        XCTAssertNotNil(json)
-        XCTAssertTrue(json!.contains("a") && json!.contains("1"))
+        let json = try ClipboardTransform.csvToJson(csv)
+        XCTAssertTrue(json.contains("a") && json.contains("1"))
     }
 
-    func testJsonArrayToCsv() {
+    func testJsonArrayToCsv() throws {
         let json = "[{\"a\":1,\"b\":2},{\"a\":3,\"b\":4}]"
-        let csv = ClipboardTransform.jsonArrayToCsv(json)
-        XCTAssertNotNil(csv)
-        XCTAssertTrue(csv!.contains("a,b") || csv!.contains("b,a"))
+        let csv = try ClipboardTransform.jsonArrayToCsv(json)
+        XCTAssertTrue(csv.contains("a,b") || csv.contains("b,a"))
     }
 
     func testCsvToTsv() {
@@ -301,7 +293,7 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertTrue(tsv.contains("\t"))
     }
 
-    func testMysqlCliTableToCsv() {
+    func testMysqlCliTableToCsv() throws {
         let input = """
         Some noise before the table
         mysql> SELECT * FROM something;
@@ -322,7 +314,7 @@ final class ClipboardHelpersTests: XCTestCase {
         'rdsadmin'@'localhost',def,INSERT,YES
         """
 
-        XCTAssertEqual(ClipboardTransform.mysqlCliTableToCsv(input), expected)
+        XCTAssertEqual(try ClipboardTransform.mysqlCliTableToCsv(input), expected)
     }
 
     func testMysqlCliTableToCsv_invalidInputReturnsNil() {
@@ -331,7 +323,76 @@ final class ClipboardHelpersTests: XCTestCase {
         | header | row |
         """
 
-        XCTAssertNil(ClipboardTransform.mysqlCliTableToCsv(input))
+        XCTAssertThrowsError(try ClipboardTransform.mysqlCliTableToCsv(input)) { error in
+            XCTAssertTrue(String(describing: error).contains("could not find a complete +--- table border block"))
+        }
+    }
+
+    func testPsqlCliTableToCsv() throws {
+        let input = """
+        pid | datname | username | client_addr | client_port | backend_start | query_start | query | state
+        -------+---------+----------+----------------+-------------+---------------------+---------------------+------------------------------------------------------+---------------------
+        1234 | mydb1 | postgres | 192.168.1.100 | 5432 | 2023-10-04 15:04:00 | 2023-10-04 15:04:05 | SELECT * FROM mytable; | active
+        5678 | mydb2 | user1 | 192.168.1.101 | 5432 | 2023-10-04 15:05:00 | 2023-10-04 15:05:03 | UPDATE mytable SET name = 'John Doe' WHERE id = 123; | idle in transaction
+        9012 | postgres | user2 | 192.168.1.102 | 5432 | 2023-10-04 15:06:00 |  |  | idle
+        """
+
+        let expected = """
+        pid,datname,username,client_addr,client_port,backend_start,query_start,query,state
+        1234,mydb1,postgres,192.168.1.100,5432,2023-10-04 15:04:00,2023-10-04 15:04:05,SELECT * FROM mytable;,active
+        5678,mydb2,user1,192.168.1.101,5432,2023-10-04 15:05:00,2023-10-04 15:05:03,UPDATE mytable SET name = 'John Doe' WHERE id = 123;,idle in transaction
+        9012,postgres,user2,192.168.1.102,5432,2023-10-04 15:06:00,,,idle
+        """
+
+        XCTAssertEqual(try ClipboardTransform.psqlCliTableToCsv(input), expected)
+    }
+
+    func testPsqlCliTableToCsv_matchesProvidedSampleShape() throws {
+        let input = """
+        pid | datname | username | client_addr | client_port | backend_start | query_start | query | state
+        -------+---------+---------+-------------+-------------+---------------+---------------+-----------------+----------
+        1234 | mydb1   | postgres | 192.168.1.100 | 5432 | 2023-10-04 15:04:00 | 2023-10-04 15:04:05 | SELECT * FROM mytable; | active
+        5678 | mydb2   | user1    | 192.168.1.101 | 5432 | 2023-10-04 15:05:00 | 2023-10-04 15:05:03 | UPDATE mytable SET name = 'John Doe' WHERE id = 123; | idle in transaction
+        9012 | postgres | 192.168.1.102 | 5432 | 2023-10-04 15:06:00 |                |                | idle |
+        """
+
+        let expected = """
+        pid,datname,username,client_addr,client_port,backend_start,query_start,query,state
+        1234,mydb1,postgres,192.168.1.100,5432,2023-10-04 15:04:00,2023-10-04 15:04:05,SELECT * FROM mytable;,active
+        5678,mydb2,user1,192.168.1.101,5432,2023-10-04 15:05:00,2023-10-04 15:05:03,UPDATE mytable SET name = 'John Doe' WHERE id = 123;,idle in transaction
+        9012,postgres,192.168.1.102,5432,2023-10-04 15:06:00,,,idle,
+        """
+
+        XCTAssertEqual(try ClipboardTransform.psqlCliTableToCsv(input), expected)
+    }
+
+    func testPsqlCliTableToCsv_ignoresRowCountFooter() throws {
+        let input = """
+        pid | datname
+        -----+---------
+        1234 | mydb1
+
+        (1 row)
+        """
+
+        let expected = """
+        pid,datname
+        1234,mydb1
+        """
+
+        XCTAssertEqual(try ClipboardTransform.psqlCliTableToCsv(input), expected)
+    }
+
+    func testPsqlCliTableToCsv_invalidInputReturnsNil() {
+        let input = """
+        pid | datname
+        not-a-separator
+        1234 | mydb1
+        """
+
+        XCTAssertThrowsError(try ClipboardTransform.psqlCliTableToCsv(input)) { error in
+            XCTAssertTrue(String(describing: error).contains("could not find the dashed separator line"))
+        }
     }
 
     // MARK: - Quote escaping
