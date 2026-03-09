@@ -273,6 +273,30 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual((obj["subObject"] as? [String: Any])?["key4"] as? Bool, true)
     }
 
+    func testYamlToJson_topLevelArrayOfObjects() throws {
+        let yaml = """
+        -
+          one: hello!
+          two: "10"
+        -
+          one: goodbuy
+          two: "20"
+        """
+
+        let json = try ClipboardTransform.yamlToJson(yaml)
+        guard let data = json.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            XCTFail("output should be a valid JSON array")
+            return
+        }
+
+        XCTAssertEqual(arr.count, 2)
+        XCTAssertEqual(arr[0]["one"] as? String, "hello!")
+        XCTAssertEqual(arr[0]["two"] as? String, "10")
+        XCTAssertEqual(arr[1]["one"] as? String, "goodbuy")
+        XCTAssertEqual(arr[1]["two"] as? String, "20")
+    }
+
     // MARK: - CSV / JSON
 
     func testCsvToJson() throws {

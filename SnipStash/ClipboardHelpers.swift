@@ -1168,9 +1168,14 @@ enum YAMLHelpers {
             if lead < baseIndent { break }
             let content = String(line.dropFirst(lead))
             let contentTrimmed = content.trimmingCharacters(in: .whitespaces)
-            if contentTrimmed.hasPrefix("- ") {
+            if contentTrimmed == "-" || contentTrimmed.hasPrefix("- ") {
                 isList = true
-                let itemStr = String(contentTrimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+                let itemStr: String
+                if contentTrimmed == "-" {
+                    itemStr = ""
+                } else {
+                    itemStr = String(contentTrimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+                }
                 index += 1
                 let nextLead = (index < lines.count) ? lines[index].prefix(while: { $0 == " " }).count : 0
                 if itemStr.isEmpty, nextLead > lead, index < lines.count, let sub = parseYAMLBlock(lines, &index, baseIndent: nextLead) {
