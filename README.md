@@ -6,15 +6,14 @@ Clipboard Envy is [available in the App Store](https://apps.apple.com/us/app/sni
 
 Note: The App Store may temporarily reflect the app's old name, SnipStash.
 
-## Purpose
+## About
 
-Clipboard Envy lives in your Menu Bar so you can capture, store, transform, and recall text snippets without leaving your workflow. It's ideal for:
+Clipboard Envy lives in your Menu Bar so you can capture, store, transform, and recall text snippets without leaving your workflow. It's ideal for Devlopers who use tools like JWT Decoders, SHA-1 Hashers, JSON Minifiers, etc. We have over 100 built-in tools, organized in a coherent, easy-access Menu.
 
-- Quick captures from the clipboard that you don't want to lose, like tracking numbers
+In addition to developer tools, Clipboard Envy is great for the average user to do things like:
+- Quickly capture snippets that you don't want to lose, like tracking numbers
 - Blocks of text you need to temporarily stash somewhere while rearranging code or a document
-- Frequently used snippets (boilerplate, commands, links, public keys, how-to steps)
-- Capturing the plaintext version of rich clipboard data
-- Unintrusive nudges that don't warrant notifications, like standing and stretching
+- Frequently used snippets (boilerplate, shell commands, links, public keys, how-to steps)
 
 ## Features
 
@@ -23,10 +22,10 @@ Clipboard Envy lives in your Menu Bar so you can capture, store, transform, and 
 - **Create, Edit, and Arrange Snippets** — Edit and manually create snippets with custom menu labels
 - **Copy to clipboard** — Copy any snippet's content back to the clipboard
 - **Open URL** — Quickly open URL snippets from the Menu Bar
-- **Persistent storage** — Clipboard Envy data is stored locally with [SwiftData](https://developer.apple.com/documentation/swiftdata/)
-- **Transform Clipboard** - Developer-friendly one-click transformations like convert clipboard contents to lowercase, prettify/minify JSON, Base64-encode/decode, sort and de-duplicate lines, and more!
-- **Set Clipboard To** - One-click to set the clipboard contents to the current epoch timestamp or a new, random UUID.
+- **Transform Clipboard Dataa** - Developer-friendly one-click transformations like convert clipboard contents to lowercase, prettify/minify JSON, Base64-encode/decode, sort and de-duplicate lines, and more!
+- **Set Clipboard Data** - One-click to set the clipboard contents to the current epoch timestamp, random values like generated passwords or UUIDs, filler text like Lorem Ipsum, and common symbols that aren't on most keyboards.
 - **Analyze Clipboard** - Reveals the number of lines, words, characters and em dashes in the clipboard.
+- **Persistent storage** — Clipboard Envy snippet data is stored locally (sorry no cloud syncing!).
 
 ## Screenshots
 
@@ -109,6 +108,6 @@ Configure these in **Settings → Secrets and variables → Actions**:
 
 Currently, the entirety of this project (application code, imagery, and documentation), save for minor edits to this README, was written 100% by Artificial Intelligence using a combination of Claude 4.x, ChatGPT 5.x, and Cursor Composer 1.x. In short, it was "Vibecoded." 
 
-While we welcome Pull Requests and other contributions from other humans, we do not accept contributions from AI bots. A human must review, understand, and sign off on all commits. Please file an issue to discuss any proposed feature before working on it.
+While we welcome Pull Requests and other contributions from other humans (including AI-generated code), we do not accept contributions from AI bots. A human must review, understand, and sign off on all commits. Please file an issue to discuss any proposed feature before working on it.
 
 When humans start contributing their own code to the project, we will update this disclosure accordingly.
