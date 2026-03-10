@@ -21,7 +21,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		D3606ADE2F5238EF00720950 /* ClipboardEnvy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipboardEnvy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D3606ADE2F5238EF00720950 /* Clipboard Envy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Clipboard Envy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3606AE12F5238F100720950 /* ClipboardEnvy/Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ClipboardEnvy/Version.xcconfig; sourceTree = SOURCE_ROOT; };
 		D36T00012F55000000720950 /* ClipboardEnvyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipboardEnvyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -71,7 +71,7 @@
 		D3606ADF2F5238EF00720950 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D3606ADE2F5238EF00720950 /* ClipboardEnvy.app */,
+				D3606ADE2F5238EF00720950 /* Clipboard Envy.app */,
 				D36T00012F55000000720950 /* ClipboardEnvyTests.xctest */,
 			);
 			name = Products;
@@ -110,7 +110,7 @@
 				D39E00022F54F000005FAE7B /* argon2 */,
 			);
 			productName = ClipboardEnvy;
-			productReference = D3606ADE2F5238EF00720950 /* ClipboardEnvy.app */;
+			productReference = D3606ADE2F5238EF00720950 /* Clipboard Envy.app */;
 			productType = "com.apple.product-type.application";
 		};
 		D36T00052F55000000720950 /* ClipboardEnvyTests */ = {
@@ -228,7 +228,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${PROJECT_DIR}/dist\"\ncp -R \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app\" \"${PROJECT_DIR}/dist/\"\necho \"ClipboardEnvy.app copied to ${PROJECT_DIR}/dist/\"\n";
+			shellScript = "mkdir -p \"${PROJECT_DIR}/dist\"\ncp -R \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app\" \"${PROJECT_DIR}/dist/\"\necho \"Clipboard Envy.app copied to ${PROJECT_DIR}/dist/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -409,7 +409,7 @@
 				);
 				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.centennialoss.snipstash;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Clipboard Envy";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -454,7 +454,7 @@
 				);
 				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.centennialoss.snipstash;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Clipboard Envy";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -469,7 +469,7 @@
 		D36T000B2F55000000720950 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/ClipboardEnvy.app/Contents/MacOS/ClipboardEnvy";
+				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/Clipboard Envy.app/Contents/MacOS/Clipboard Envy";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 86G4NP75W9;
@@ -487,7 +487,7 @@
 		D36T000C2F55000000720950 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/ClipboardEnvy.app/Contents/MacOS/ClipboardEnvy";
+				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/Clipboard Envy.app/Contents/MacOS/Clipboard Envy";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 86G4NP75W9;

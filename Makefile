@@ -25,7 +25,7 @@ build:
 		printf 'MARKETING_VERSION = %s\nINFOPLIST_KEY_NSHumanReadableCopyright = Copyright © 2026 Centennial OSS\n' "$(TAGVER)" > ClipboardEnvy/Version.xcconfig; \
 	fi
 	xcodebuild -scheme ClipboardEnvy -configuration Debug -derivedDataPath build/DerivedData build
-	cp -R build/DerivedData/Build/Products/Debug/ClipboardEnvy.app build/
+	cp -R "build/DerivedData/Build/Products/Debug/Clipboard Envy.app" build/
 
 build-release:
 	mkdir -p dist
@@ -33,7 +33,7 @@ build-release:
 		printf 'MARKETING_VERSION = %s\nINFOPLIST_KEY_NSHumanReadableCopyright = Copyright © 2026 Centennial OSS\n' "$(TAGVER)" > ClipboardEnvy/Version.xcconfig; \
 	fi
 	xcodebuild -scheme ClipboardEnvy -configuration Release -derivedDataPath dist/DerivedData build
-	cp -R dist/DerivedData/Build/Products/Release/ClipboardEnvy.app dist/
+	cp -R "dist/DerivedData/Build/Products/Release/Clipboard Envy.app" dist/
 
 # Run Swift tests.
 test:

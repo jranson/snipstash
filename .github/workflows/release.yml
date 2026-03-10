@@ -68,8 +68,8 @@ jobs:
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          APP_PATH="build/Build/Products/Release/ClipboardEnvy.app"
-          XCENT="build/Build/Intermediates.noindex/ClipboardEnvy.build/Release/ClipboardEnvy.build/ClipboardEnvy.app.xcent"
+          APP_PATH="build/Build/Products/Release/Clipboard Envy.app"
+          XCENT="build/Build/Intermediates.noindex/ClipboardEnvy.build/Release/ClipboardEnvy.build/Clipboard Envy.app.xcent"
           ENTITLEMENTS="build/Release.entitlements"
           cp "$XCENT" "$ENTITLEMENTS"
           # get-task-allow is for debugging only; must be false for notarization
@@ -91,7 +91,7 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD"
           cd build/Build/Products/Release
-          ditto -c -k --keepParent ClipboardEnvy.app notarization.zip
+          ditto -c -k --keepParent "Clipboard Envy.app" notarization.zip
           SUBMIT_OUTPUT=$(xcrun notarytool submit notarization.zip --keychain-profile "notarytool-profile" --wait 2>&1)
           echo "$SUBMIT_OUTPUT"
           SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
@@ -102,14 +102,14 @@ jobs:
             echo "--- End log ---"
             exit 1
           fi
-          xcrun stapler staple ClipboardEnvy.app
+          xcrun stapler staple "Clipboard Envy.app"
           rm notarization.zip
 
       - name: Prepare release asset
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           cd build/Build/Products/Release
-          zip -r "ClipboardEnvy-${VERSION}-macOS-universal.zip" ClipboardEnvy.app
+          zip -r "ClipboardEnvy-${VERSION}-macOS-universal.zip" "Clipboard Envy.app"
           mv "ClipboardEnvy-${VERSION}-macOS-universal.zip" "$GITHUB_WORKSPACE/"
 
       - name: Create Release

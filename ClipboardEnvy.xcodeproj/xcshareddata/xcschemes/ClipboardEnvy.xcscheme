@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D3606ADD2F5238EF00720950"
-               BuildableName = "ClipboardEnvy.app"
+               BuildableName = "Clipboard Envy.app"
                BlueprintName = "ClipboardEnvy"
                ReferencedContainer = "container:ClipboardEnvy.xcodeproj">
             </BuildableReference>
@@ -70,7 +70,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D3606ADD2F5238EF00720950"
-            BuildableName = "ClipboardEnvy.app"
+            BuildableName = "Clipboard Envy.app"
             BlueprintName = "ClipboardEnvy"
             ReferencedContainer = "container:ClipboardEnvy.xcodeproj">
          </BuildableReference>
@@ -87,7 +87,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D3606ADD2F5238EF00720950"
-            BuildableName = "ClipboardEnvy.app"
+            BuildableName = "Clipboard Envy.app"
             BlueprintName = "ClipboardEnvy"
             ReferencedContainer = "container:ClipboardEnvy.xcodeproj">
          </BuildableReference>
@@ -110,7 +110,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D3606ADD2F5238EF00720950"
-            BuildableName = "ClipboardEnvy.app"
+            BuildableName = "Clipboard Envy.app"
             BlueprintName = "ClipboardEnvy"
             ReferencedContainer = "container:ClipboardEnvy.xcodeproj">
          </BuildableReference>
