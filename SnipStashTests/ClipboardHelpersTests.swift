@@ -162,6 +162,24 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(ClipboardTransform.jsonMinify(pretty), min)
     }
 
+    func testJsonPrettifyMinify_supportsCommentedJsonLines() {
+        let commented = """
+            // this is a comment
+            {
+              // inline group comment
+              "b": 2,
+              "a": 1
+            }
+            """
+        let minified = ClipboardTransform.jsonMinify(commented)
+        let minifiedObj = try? JSONSerialization.jsonObject(with: Data(minified.utf8)) as? [String: Int]
+        XCTAssertEqual(minifiedObj, ["a": 1, "b": 2])
+        let pretty = ClipboardTransform.jsonPrettify(commented)
+        XCTAssertTrue(pretty.contains("\n"))
+        XCTAssertTrue(pretty.contains("\"a\""))
+        XCTAssertTrue(pretty.contains("\"b\""))
+    }
+
     func testJsonSortKeys_minifiedInput_returnsMinifiedSortedOutput() {
         // No newlines → minify sorted output
         let result = ClipboardTransform.jsonSortKeys("{\"z\":3,\"a\":1,\"m\":2}")
@@ -220,6 +238,45 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(ClipboardTransform.jsonStripNulls(bad), bad)
     }
 
+    func testJsonTransforms_supportCommentedJsonLines() {
+        let commented = """
+            // comment
+            {"obj":{"a":1,"b":null},"arr":[{"c":2},null]}
+            """
+        XCTAssertEqual(ClipboardTransform.jsonSortKeys(commented), "{\"arr\":[{\"c\":2},null],\"obj\":{\"a\":1,\"b\":null}}")
+        XCTAssertEqual(ClipboardTransform.jsonStripNulls(commented), "{\"arr\":[{\"c\":2}],\"obj\":{\"a\":1}}")
+        XCTAssertEqual(ClipboardTransform.jsonTopLevelKeys(commented), "arr\nobj")
+        XCTAssertEqual(ClipboardTransform.jsonAllKeys(commented), "a\narr\nb\nc\nobj")
+    }
+
+    func testJsonTopLevelKeys_object_returnsOnlyRootKeysSorted() {
+        let input = #"{"z":1,"a":{"k":2},"m":[{"inner":3}]}"#
+        let result = ClipboardTransform.jsonTopLevelKeys(input)
+        XCTAssertEqual(result, "a\nm\nz")
+    }
+
+    func testJsonTopLevelKeys_array_returnsUnionOfObjectElementKeysSorted() {
+        let input = #"[{"a":1,"z":9},{"b":2},{"a":3,"m":4},5]"#
+        let result = ClipboardTransform.jsonTopLevelKeys(input)
+        XCTAssertEqual(result, "a\nb\nm\nz")
+    }
+
+    func testJsonAllKeys_returnsRecursiveUnionSorted() {
+        let input = #"{"root":1,"obj":{"a":2,"nested":{"b":3}},"arr":[{"c":4},5],"z":null}"#
+        let result = ClipboardTransform.jsonAllKeys(input)
+        XCTAssertEqual(result, "a\narr\nb\nc\nnested\nobj\nroot\nz")
+    }
+
+    func testJsonTopLevelKeys_invalidJson_returnsInputUnchanged() {
+        let bad = "not json"
+        XCTAssertEqual(ClipboardTransform.jsonTopLevelKeys(bad), bad)
+    }
+
+    func testJsonAllKeys_invalidJson_returnsInputUnchanged() {
+        let bad = "not json"
+        XCTAssertEqual(ClipboardTransform.jsonAllKeys(bad), bad)
+    }
+
     // MARK: - YAML
 
     func testYamlPrettifyMinify() {
@@ -273,6 +330,16 @@ final class ClipboardHelpersTests: XCTestCase {
         let json = "{\"name\":\"x\",\"count\":2}"
         let yaml = try ClipboardTransform.jsonToYaml(json)
         XCTAssertTrue(yaml.contains("name:"))
+    }
+
+    func testJsonToYaml_supportsCommentedJsonLines() throws {
+        let commented = """
+            // metadata comment
+            {"name":"x","count":2}
+            """
+        let yaml = try ClipboardTransform.jsonToYaml(commented)
+        XCTAssertTrue(yaml.contains("name: x"))
+        XCTAssertTrue(yaml.contains("count: 2"))
     }
 
     /// JSON string values that look like numbers (e.g. "2.8") must be emitted quoted in YAML so they stay strings.
@@ -442,6 +509,17 @@ final class ClipboardHelpersTests: XCTestCase {
         let json = "[{\"a\":1,\"b\":2},{\"a\":3,\"b\":4}]"
         let csv = try ClipboardTransform.jsonArrayToCsv(json)
         XCTAssertTrue(csv.contains("a,b") || csv.contains("b,a"))
+    }
+
+    func testJsonArrayToCsv_supportsCommentedJsonLines() throws {
+        let json = """
+            \t// exported rows
+            [{"a":1,"b":2},{"a":3,"b":4}]
+            """
+        let csv = try ClipboardTransform.jsonArrayToCsv(json)
+        XCTAssertTrue(csv.contains("a,b"), "expected sorted headers")
+        XCTAssertTrue(csv.contains("1,2"))
+        XCTAssertTrue(csv.contains("3,4"))
     }
 
     func testCsvToTsv() {

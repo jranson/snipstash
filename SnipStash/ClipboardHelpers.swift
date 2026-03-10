@@ -404,7 +404,8 @@ enum ClipboardTransform {
     // MARK: - JSON
 
     nonisolated static func jsonPrettify(_ s: String) -> String {
-        guard let data = s.data(using: .utf8),
+        let sanitized = sanitizeCommentedJSONInput(s)
+        guard let data = sanitized.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data),
               let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
               let out = String(data: pretty, encoding: .utf8) else { return s }
@@ -412,7 +413,8 @@ enum ClipboardTransform {
     }
 
     nonisolated static func jsonMinify(_ s: String) -> String {
-        guard let data = s.data(using: .utf8),
+        let sanitized = sanitizeCommentedJSONInput(s)
+        guard let data = sanitized.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data),
               let compact = try? JSONSerialization.data(withJSONObject: json),
               let out = String(data: compact, encoding: .utf8) else { return s }
@@ -421,7 +423,7 @@ enum ClipboardTransform {
 
     /// Sort JSON keys alphabetically. Minifies if trimmed input has no newlines; prettifies otherwise.
     nonisolated static func jsonSortKeys(_ s: String) -> String {
-        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = sanitizeCommentedJSONInput(s).trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) else { return s }
         let newlineCount = trimmed.components(separatedBy: "\n").count - 1
@@ -438,16 +440,49 @@ enum ClipboardTransform {
 
     /// Remove JSON null values recursively while preserving string values like "null".
     nonisolated static func jsonStripNulls(_ s: String) -> String {
-        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = sanitizeCommentedJSONInput(s).trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) else { return s }
         let stripped = stripJSONNulls(from: json)
-        let newlineCount = trimmed.components(separatedBy: "\n").count - 1
-        let options: JSONSerialization.WritingOptions = newlineCount == 0 ? [.sortedKeys] : [.prettyPrinted, .sortedKeys]
-        guard JSONSerialization.isValidJSONObject(stripped),
-              let outputData = try? JSONSerialization.data(withJSONObject: stripped, options: options),
-              let out = String(data: outputData, encoding: .utf8) else { return s }
-        return out
+        return serializeJSONLikeInput(stripped, trimmedInput: trimmed, fallback: s)
+    }
+
+    /// Extract top-level JSON keys.
+    /// - Object root: returns that object's keys.
+    /// - Array root: returns the union of keys from object elements in the array.
+    /// Output is a newline-delimited, alphabetically sorted list of keys.
+    nonisolated static func jsonTopLevelKeys(_ s: String) -> String {
+        let trimmed = sanitizeCommentedJSONInput(s).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) else { return s }
+
+        var keys = Set<String>()
+        if let dictionary = json as? [String: Any] {
+            keys.formUnion(dictionary.keys)
+        } else if let array = json as? [Any] {
+            for element in array {
+                if let dictionary = element as? [String: Any] {
+                    keys.formUnion(dictionary.keys)
+                }
+            }
+        } else {
+            return s
+        }
+        guard !keys.isEmpty else { return s }
+        return keys.sorted().joined(separator: "\n")
+    }
+
+    /// Extract all JSON keys recursively from nested objects/arrays.
+    /// Output is a newline-delimited, alphabetically sorted list of keys.
+    nonisolated static func jsonAllKeys(_ s: String) -> String {
+        let trimmed = sanitizeCommentedJSONInput(s).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) else { return s }
+
+        var keys = Set<String>()
+        collectJSONKeys(from: json, into: &keys)
+        guard !keys.isEmpty else { return s }
+        return keys.sorted().joined(separator: "\n")
     }
 
     private nonisolated static func stripJSONNulls(from value: Any) -> Any {
@@ -469,6 +504,41 @@ enum ClipboardTransform {
             }
         }
         return value
+    }
+
+    private nonisolated static func collectJSONKeys(from value: Any, into keys: inout Set<String>) {
+        if let dictionary = value as? [String: Any] {
+            keys.formUnion(dictionary.keys)
+            for nestedValue in dictionary.values {
+                collectJSONKeys(from: nestedValue, into: &keys)
+            }
+        } else if let array = value as? [Any] {
+            for element in array {
+                collectJSONKeys(from: element, into: &keys)
+            }
+        }
+    }
+
+    private nonisolated static func serializeJSONLikeInput(_ value: Any, trimmedInput: String, fallback: String) -> String {
+        let newlineCount = trimmedInput.components(separatedBy: "\n").count - 1
+        let options: JSONSerialization.WritingOptions = newlineCount == 0 ? [.sortedKeys] : [.prettyPrinted, .sortedKeys]
+        guard JSONSerialization.isValidJSONObject(value),
+              let outputData = try? JSONSerialization.data(withJSONObject: value, options: options),
+              let out = String(data: outputData, encoding: .utf8) else { return fallback }
+        return out
+    }
+
+    /// Removes full-line comments from JSON-like input. Any line whose first non-space/tab
+    /// characters are `//` is dropped before JSON parsing.
+    private nonisolated static func sanitizeCommentedJSONInput(_ s: String) -> String {
+        s
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { line in
+                let trimmedLeading = line.drop { $0 == " " || $0 == "\t" }
+                return !trimmedLeading.hasPrefix("//")
+            }
+            .map(String.init)
+            .joined(separator: "\n")
     }
 
     // MARK: - YAML (pure Swift; handles JSON-compatible YAML and simple indented key: value)
@@ -499,7 +569,8 @@ enum ClipboardTransform {
 
     /// Convert JSON string to YAML-style output (indented key: value, list items with -).
     nonisolated static func jsonToYaml(_ s: String) throws -> String {
-        guard let data = s.data(using: .utf8),
+        let sanitized = sanitizeCommentedJSONInput(s)
+        guard let data = sanitized.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) else {
             throw TransformError(description: "JSON → YAML failed: clipboard does not contain valid JSON.")
         }
@@ -566,7 +637,8 @@ enum ClipboardTransform {
 
     /// Parse JSON array of objects and output CSV with headers from first object keys.
     nonisolated static func jsonArrayToCsv(_ s: String) throws -> String {
-        guard let data = s.data(using: .utf8),
+        let sanitized = sanitizeCommentedJSONInput(s)
+        guard let data = sanitized.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
               !array.isEmpty else {
             throw TransformError(description: "JSON Array → CSV failed: clipboard must contain a non-empty JSON array of objects.")

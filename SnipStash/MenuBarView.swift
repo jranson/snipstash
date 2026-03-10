@@ -85,33 +85,43 @@ struct MenuBarView: View {
                 Button("CONST_CASE") { transformClipboard(ClipboardTransform.constCase) }
             }
             Menu("URLs") {
-                Button("Host (Domain)") { transformClipboardIfValid(ClipboardTransform.urlExtractHostIfValid) }
-                Button("Host[:Port]") { transformClipboardIfValid(ClipboardTransform.urlExtractHostPortIfValid) }
-                Button("Port") { transformClipboardIfValid(ClipboardTransform.urlExtractPortIfValid) }
-                Button("Path") { transformClipboardIfValid(ClipboardTransform.urlExtractPathIfValid) }
-                Button("Params") { transformClipboardIfValid(ClipboardTransform.urlExtractQueryIfValid) }
-                Button("Hash") { transformClipboardIfValid(ClipboardTransform.urlExtractFragmentIfValid) }
+                Section("Extract") {
+                    Button("Host (Domain)") { transformClipboardIfValid(ClipboardTransform.urlExtractHostIfValid) }
+                    Button("Host[:Port]") { transformClipboardIfValid(ClipboardTransform.urlExtractHostPortIfValid) }
+                    Button("Port") { transformClipboardIfValid(ClipboardTransform.urlExtractPortIfValid) }
+                    Button("Path") { transformClipboardIfValid(ClipboardTransform.urlExtractPathIfValid) }
+                    Button("Params") { transformClipboardIfValid(ClipboardTransform.urlExtractQueryIfValid) }
+                    Button("Hash") { transformClipboardIfValid(ClipboardTransform.urlExtractFragmentIfValid) }
+                }
                 Divider()
                 Button("Strip URL Params") { transformClipboardIfValid(ClipboardTransform.stripUrlParamsIfValid) }
                 Button("URL-encode") { transformClipboard(ClipboardTransform.urlEncode) }
                 Button("URL-decode") { transformClipboard(ClipboardTransform.urlDecode) }
             }
             Menu("Encode & Hash") {
-                Button("Base64 Encode") { transformClipboard(ClipboardTransform.base64Encode) }
-                Button("Base64 Decode") { transformClipboard(ClipboardTransform.base64Decode) }
-                Button("Base64URL Encode") { transformClipboard(ClipboardTransform.base64URLEncode) }
-                Button("Base64URL Decode") { transformClipboard(ClipboardTransform.base64URLDecode) }
+                Section("Base64") {
+                    Button("Encode") { transformClipboard(ClipboardTransform.base64Encode) }
+                    Button("Decode") { transformClipboard(ClipboardTransform.base64Decode) }
+                }
+                Section("Base64 URL-Safe") {
+                    Button("Encode") { transformClipboard(ClipboardTransform.base64URLEncode) }
+                    Button("Decode") { transformClipboard(ClipboardTransform.base64URLDecode) }
+                }
                 Divider()
                 Button("JWT Decode") { transformClipboardIfValid(ClipboardTransform.jwtDecode) }
                 Divider()
-                Button("MD5 Checksum") { transformClipboard(ClipboardTransform.md5Checksum) }
-                Button("SHA-1 Checksum") { transformClipboard(ClipboardTransform.sha1Checksum) }
-                Button("SHA-256 Checksum") { transformClipboard(ClipboardTransform.sha256Checksum) }
-                Button("SHA-512 Checksum") { transformClipboard(ClipboardTransform.sha512Checksum) }
-                Button("CRC32 Checksum") { transformClipboard(ClipboardTransform.crc32) }
+                Section("Calculate Checksum") {
+                    Button("MD5") { transformClipboard(ClipboardTransform.md5Checksum) }
+                    Button("SHA-1") { transformClipboard(ClipboardTransform.sha1Checksum) }
+                    Button("SHA-256") { transformClipboard(ClipboardTransform.sha256Checksum) }
+                    Button("SHA-512") { transformClipboard(ClipboardTransform.sha512Checksum) }
+                    Button("CRC32") { transformClipboard(ClipboardTransform.crc32) }
+                }
                 Divider()
-                Button("Argon2id Hash") { transformClipboardIfValid(ClipboardTransform.argon2idHash) }
-                Button("bcrypt Hash") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
+                Section("Hash Credentials") {
+                    Button("Argon2id") { transformClipboardIfValid(ClipboardTransform.argon2idHash) }
+                    Button("bcrypt") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
+                }
             }
             Menu("Multi-line") {
                 Button("Sort Lines") { transformClipboard(ClipboardTransform.sortLines) }
@@ -124,39 +134,58 @@ struct MenuBarView: View {
                 Button("Indent Lines") { transformClipboard(ClipboardTransform.indentLines) }
                 Button("Un-indent Lines") { transformClipboard(ClipboardTransform.unindentLines) }
                 Button("Trim Lines") { transformClipboard(ClipboardTransform.trimLines) }
+                // TODO:
+                // Add "Remove First Char / Line"
+                // Add "Remove Last Char / Line"
                 Divider()
                 Button("CRLF → LF (strip \\r)") { transformClipboard(ClipboardTransform.windowsNewlinesToUnix) }
             }
-            Menu("Structured") {
-                Button("JSON Prettify") { transformClipboard(ClipboardTransform.jsonPrettify) }
-                Button("JSON Minify") { transformClipboard(ClipboardTransform.jsonMinify) }
-                Button("JSON Sort Keys") { transformClipboard(ClipboardTransform.jsonSortKeys) }
-                Button("JSON Strip Nulls") { transformClipboard(ClipboardTransform.jsonStripNulls) }
+            Menu("JSON & YAML") {
+                Section("JSON") {
+                    Button("Prettify") { transformClipboard(ClipboardTransform.jsonPrettify) }
+                    Button("Minify") { transformClipboard(ClipboardTransform.jsonMinify) }
+                    Button("Sort Keys") { transformClipboard(ClipboardTransform.jsonSortKeys) }
+                    Button("Strip Nulls") { transformClipboard(ClipboardTransform.jsonStripNulls) }
+                    Button("Top-Level Keys") { transformClipboard(ClipboardTransform.jsonTopLevelKeys) }
+                    Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
+                    Button("[ ] → CSV") { transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv) }
+                    Button("→ YAML") { transformClipboardIfValid(ClipboardTransform.jsonToYaml) }
+                }
                 Divider()
-                Button("YAML Prettify") { transformClipboard(ClipboardTransform.yamlPrettify) }
-                Button("YAML Minify") { transformClipboard(ClipboardTransform.yamlMinify) }
-                Divider()
-                Button("JSON → YAML") { transformClipboardIfValid(ClipboardTransform.jsonToYaml) }
-                Button("YAML → JSON") { transformClipboardIfValid(ClipboardTransform.yamlToJson) }
-                Divider()
-                Button("JSON Array → CSV") { transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv) }
-                Button("CSV → JSON (typed)") { transformClipboardIfValid(ClipboardTransform.csvToJson) }
-                Button("CSV → JSON (strings)") { transformClipboardIfValid(ClipboardTransform.csvToJsonStrings) }
-                Divider()
-                Button("CSV → TSV") { transformClipboard(ClipboardTransform.csvToTsv) }
-                Button("TSV → CSV") { transformClipboardIfValid(ClipboardTransform.tsvToCsv) }
-                Button("CSV → PSV") { transformClipboard(ClipboardTransform.csvToPsv) }
-                Button("PSV → CSV") { transformClipboardIfValid(ClipboardTransform.psvToCsv) }
+                Section("YAML") {
+                    Button("Prettify") { transformClipboard(ClipboardTransform.yamlPrettify) }
+                    Button("Minify") { transformClipboard(ClipboardTransform.yamlMinify) }
+                    Button("→ JSON") { transformClipboardIfValid(ClipboardTransform.yamlToJson) }
+                }
             }
-            Menu("Database") {
-                Button("MySQL CLI Table → CSV") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToCsv) }
-                Button("MySQL CLI Table → JSON") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToJson) }
+            Menu("CSV") {
+                Section("CSV") {
+                    Button("→ JSON (typed)") { transformClipboardIfValid(ClipboardTransform.csvToJson) }
+                    Button("→ JSON (strings)") { transformClipboardIfValid(ClipboardTransform.csvToJsonStrings) }
+                }
                 Divider()
-                Button("psql Table → CSV") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToCsv) }
-                Button("psql Table → JSON") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToJson) }
+                Section("Tab/Pipe-Separated") {
+                    Button("CSV → TSV") { transformClipboard(ClipboardTransform.csvToTsv) }
+                    Button("CSV → PSV") { transformClipboard(ClipboardTransform.csvToPsv) }
+                    Button("TSV → CSV") { transformClipboardIfValid(ClipboardTransform.tsvToCsv) }
+                    Button("PSV → CSV") { transformClipboardIfValid(ClipboardTransform.psvToCsv) }
+                }
+            }
+            Menu("Database CLI") {
+                Section("mysql") {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToCsv) }
+                    Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToJson) }
+                }
                 Divider()
-                Button("sqlite3 Table → CSV") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToCsv) }
-                Button("sqlite3 Table → JSON") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToJson) }
+                Section("psql") {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToCsv) }
+                    Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToJson) }
+                }
+                Divider()
+                Section("sqlite3") {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToCsv) }
+                    Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToJson) }
+                }
             }
             Menu("Escaping") {
                 Button("Escape Double Quotes") { transformClipboard(ClipboardTransform.escapeDoubleQuotes) }
@@ -185,8 +214,10 @@ struct MenuBarView: View {
             Menu("Time") {
                 Button("Epoch (s)") { setClipboardToEpochSeconds() }
                 Button("Epoch (ms)") { setClipboardToEpochMilliseconds() }
+                    Divider()
                 Button("SQL DateTime (Local)") { setClipboardToSQLDateTimeLocal() }
                 Button("SQL DateTime (UTC)") { setClipboardToSQLDateTimeUTC() }
+                    Divider()
                 Button("RFC3339 (Z)") { setClipboardToRFC3339Z() }
                 Button("RFC3339 (+offset)") { setClipboardToRFC3339WithOffset() }
                 Button("RFC3339 (tz abbrev)") { setClipboardToRFC3339WithAbbreviation() }
@@ -202,15 +233,15 @@ struct MenuBarView: View {
                     Button("Middle dot ·") { setClipboardTo("·") }
                     Button("Bullet •") { setClipboardTo("•") }
                     Button("Open Bullet ◦") { setClipboardTo("◦") }
-                    Button("Circle ●") { setClipboardTo("●") }
-                    Button("Open Circle ○") { setClipboardTo("○") }
+                    Button("Lg Bullet ●") { setClipboardTo("●") }
+                    Button("Lg Open Bullet ○") { setClipboardTo("○") }
                     Button("Square Bullet ▪") { setClipboardTo("▪") }
                     Button("Open Square ▫") { setClipboardTo("▫") }
-                    Button("Small Triangle Bullet ▸") { setClipboardTo("▸") }
-                    Button("Triangle Bullet ▶") { setClipboardTo("▶") }
+                    Button("Triangle Bullet ▸") { setClipboardTo("▸") }
+                    Button("Lg Triangle Bullet ▶") { setClipboardTo("▶") }
                     Button("Diamond Bullet ◆") { setClipboardTo("◆") }
-                    Button("Black star ★") { setClipboardTo("★") }
-                    Button("White star ☆") { setClipboardTo("☆") }
+                    Button("Filled Star ★") { setClipboardTo("★") }
+                    Button("Open Star ☆") { setClipboardTo("☆") }
                 }
                 Menu("Math") {
                     Button("Squared ²") { setClipboardTo("²") }
@@ -235,24 +266,24 @@ struct MenuBarView: View {
                     Button("Trademark ™") { setClipboardTo("™") }
                     Button("Section §") { setClipboardTo("§") }
                 }
-                Menu("Whitespace") {
-                    Button("Tab character") { setClipboardTo("\t") }
-                    Button("Non-breaking space") { setClipboardTo("\u{00A0}") }
-                    Button("Pilcrow (paragraph) ¶") { setClipboardTo("¶") }
+                Menu("Spaces") {
+                    Button("Tab") { setClipboardTo("\t") }
+                    Button("Non-breaking") { setClipboardTo("\u{00A0}") }
+                    Button("Pilcrow ¶") { setClipboardTo("¶") }
                 }
                 Menu("Arrows") {
-                    Button("Right arrow →") { setClipboardTo("→") }
-                    Button("Left arrow ←") { setClipboardTo("←") }
-                    Button("Up arrow ↑") { setClipboardTo("↑") }
-                    Button("Down arrow ↓") { setClipboardTo("↓") }
-                    Button("Right double arrow ⇒") { setClipboardTo("⇒") }
-                    Button("Left double arrow ⇐") { setClipboardTo("⇐") }
+                    Button("Right →") { setClipboardTo("→") }
+                    Button("Left ←") { setClipboardTo("←") }
+                    Button("Up ↑") { setClipboardTo("↑") }
+                    Button("Down ↓") { setClipboardTo("↓") }
+                    Button("Right double ⇒") { setClipboardTo("⇒") }
+                    Button("Left double ⇐") { setClipboardTo("⇐") }
                 }
                 Menu("Units") {
                     Button("Degrees °") { setClipboardTo("°") }
                     Button("Micro µ") { setClipboardTo("µ") }
                     Button("Per mille ‰") { setClipboardTo("‰") }
-                    Button("Basis points ‱") { setClipboardTo("‱") }
+                    Button("Basis pts. ‱") { setClipboardTo("‱") }
                     Divider()
                     Button("Euro €") { setClipboardTo("€") }
                     Button("Pound £") { setClipboardTo("£") }
@@ -261,18 +292,26 @@ struct MenuBarView: View {
                 }
             }
             Menu("Random") {
-                Button("UUID (Lowercase)") { setClipboardToRandomUUIDLowercase() }
-                Button("UUID (Uppercase)") { setClipboardToRandomUUID() }
+                Section("UUID") {
+                    Button("Lowercase") { setClipboardToRandomUUIDLowercase() }
+                    Button("Uppercase") { setClipboardToRandomUUID() }
+                }
                 Divider()
-                Button("Hex String (16 bytes)") { setClipboardToRandomHex(byteCount: 16) }
-                Button("Hex String (32 bytes)") { setClipboardToRandomHex(byteCount: 32) }
+                Section("Hex Strings") {
+                    Button("6 Bytes / 12 Chr") { setClipboardToRandomHex(byteCount: 6) }
+                    Button("8 Bytes / 16 Chr") { setClipboardToRandomHex(byteCount: 8) }
+                    Button("16 Bytes / 32 Chr") { setClipboardToRandomHex(byteCount: 16) }
+                    Button("32 Bytes / 64 Chr") { setClipboardToRandomHex(byteCount: 32) }
+                }
                 Divider()
                 Button("ULID") { setClipboardToRandomULID() }
                 Button("NanoID") { setClipboardToRandomNanoID() }
                 Divider()
-                Button("Very Complex Password") { setClipboardToRandomVeryComplexPassword() }
-                Button("Complex Password") { setClipboardToRandomComplexPassword() }
-                Button("Alphanumeric Password") { setClipboardToRandomAlphanumericPassword() }
+                Section("Generate Password") {
+                    Button("Very Complex") { setClipboardToRandomVeryComplexPassword() }
+                    Button("Complex") { setClipboardToRandomComplexPassword() }
+                    Button("Alphanumeric") { setClipboardToRandomAlphanumericPassword() }
+                }
             }
             Menu("Filler") {
                 Button("Lorem Ipsum (Short)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderShort) }
