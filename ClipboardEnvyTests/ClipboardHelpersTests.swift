@@ -1,5 +1,5 @@
 import XCTest
-@testable import ClipboardEnvy
+@testable import Clipboard_Envy
 
 @MainActor
 final class ClipboardHelpersTests: XCTestCase {
@@ -236,6 +236,50 @@ final class ClipboardHelpersTests: XCTestCase {
     func testJsonStripNulls_invalidJson_returnsInputUnchanged() {
         let bad = "not json"
         XCTAssertEqual(ClipboardTransform.jsonStripNulls(bad), bad)
+    }
+
+    func testJsonStripEmptyStrings_minifiedInput() {
+        let input = #"{"a":1,"b":"","c":"hello","d":{"e":"","f":2},"g":[1,"","world",{"h":"","i":3}]}"#
+        let result = ClipboardTransform.jsonStripEmptyStrings(input)
+        let expected = #"{"a":1,"c":"hello","d":{"f":2},"g":[1,"world",{"i":3}]}"#
+        XCTAssertEqual(result, expected)
+    }
+
+    func testJsonStripEmptyStrings_prettyInput() throws {
+        let input = """
+        {
+          "a": "",
+          "b": {
+            "c": 1,
+            "d": ""
+          },
+          "e": [
+            "",
+            2
+          ]
+        }
+        """
+        let result = ClipboardTransform.jsonStripEmptyStrings(input)
+        let rows = try decodeJSONArray("[\(result)]")
+        let obj = try XCTUnwrap(rows.first)
+
+        XCTAssertNil(obj["a"])
+        XCTAssertEqual((obj["b"] as? [String: Any])?["c"] as? Int, 1)
+        XCTAssertNil((obj["b"] as? [String: Any])?["d"])
+        XCTAssertEqual(obj["e"] as? [Int], [2])
+    }
+
+    func testJsonStripEmptyStrings_invalidJson_returnsInputUnchanged() {
+        let bad = "not json"
+        XCTAssertEqual(ClipboardTransform.jsonStripEmptyStrings(bad), bad)
+    }
+
+    func testJsonStripEmptyStrings_supportCommentedJsonLines() {
+        let commented = """
+            // comment
+            {"obj":{"a":1,"b":""},"arr":[{"c":2},""]}
+            """
+        XCTAssertEqual(ClipboardTransform.jsonStripEmptyStrings(commented), "{\"arr\":[{\"c\":2}],\"obj\":{\"a\":1}}")
     }
 
     func testJsonTransforms_supportCommentedJsonLines() {
@@ -490,6 +534,24 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(rows[0]["label"] as? Int, 12)
         XCTAssertEqual(rows[1]["label"] as? Int, 12)
         XCTAssertTrue(rows[2]["label"] is NSNull)
+    }
+
+    func testCsvToJson_emptyStringCellsAreNull() throws {
+        let csv = """
+        id,name,description
+        1,Alice,
+        2,,hello
+        3,,
+        """
+        let rows = try decodeJSONArray(ClipboardTransform.csvToJson(csv))
+
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0]["name"] as? String, "Alice")
+        XCTAssertTrue(rows[0]["description"] is NSNull, "empty string cell should be null")
+        XCTAssertTrue(rows[1]["name"] is NSNull, "empty string cell should be null")
+        XCTAssertEqual(rows[1]["description"] as? String, "hello")
+        XCTAssertTrue(rows[2]["name"] is NSNull)
+        XCTAssertTrue(rows[2]["description"] is NSNull)
     }
 
     func testCsvToJsonStrings() throws {
@@ -904,6 +966,359 @@ final class ClipboardHelpersTests: XCTestCase {
         let tagB64 = String(parts[4])
         XCTAssertEqual(tagB64, "zWovv0ZTstoTMc7fqZAl/hby11hra4FQFSFYAGW2IFs",
                        "Argon2id tag does not match reference. Full PHC: \(phc)")
+    }
+
+    // MARK: - Time Format Parsing
+
+    func testParseEpochSeconds() {
+        let date = TimeFormat.parseEpochSeconds("1704067200")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseEpochMilliseconds() {
+        let date = TimeFormat.parseEpochMilliseconds("1704067200000")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseEpochMilliseconds_rejectsShortNumbers() {
+        XCTAssertNil(TimeFormat.parseEpochMilliseconds("1704067200"))
+    }
+
+    func testParseRFC3339_withZ() {
+        let date = TimeFormat.parseRFC3339("2024-01-01T00:00:00.000Z")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseRFC3339_withOffset() {
+        let date = TimeFormat.parseRFC3339("2024-01-01T00:00:00+00:00")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseRFC3339_withAbbreviation() {
+        let date = TimeFormat.parseRFC3339("2024-01-01T00:00:00.000GMT")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseSQLDateTime() {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone.current
+        let expected = f.date(from: "2024-01-01 12:30:45")
+
+        let date = TimeFormat.parseSQLDateTime("2024-01-01 12:30:45")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(date, expected)
+    }
+
+    func testParseRFC1123() {
+        let date = TimeFormat.parseRFC1123("Mon, 01 Jan 2024 00:00:00 GMT")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseSlashDateTime_YYYYMMDD() {
+        let date = TimeFormat.parseSlashDateTime("2024/01/15")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseSlashDateTime_YYYYMMDDHHmmss() {
+        let date = TimeFormat.parseSlashDateTime("2024/01/15 12:30:45")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseSlashDateTime_YYYYMMDDHH() {
+        let date = TimeFormat.parseSlashDateTime("2024/01/15/12")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseSlashDateTime_YYMMDD() {
+        let date = TimeFormat.parseSlashDateTime("24/01/15")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseSlashDateTime_YYMMDDHHmmss() {
+        let date = TimeFormat.parseSlashDateTime("24/01/15 12:30:45")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseSlashDateTime_twoDigitYear_lessThan70_treatedAs2000s() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone.current
+
+        let date26 = TimeFormat.parseSlashDateTime("26/03/10 21:11:53")
+        XCTAssertNotNil(date26)
+        XCTAssertEqual(calendar.component(.year, from: date26!), 2026)
+
+        let date00 = TimeFormat.parseSlashDateTime("00/06/15")
+        XCTAssertNotNil(date00)
+        XCTAssertEqual(calendar.component(.year, from: date00!), 2000)
+
+        let date69 = TimeFormat.parseSlashDateTime("69/12/31")
+        XCTAssertNotNil(date69)
+        XCTAssertEqual(calendar.component(.year, from: date69!), 2069)
+    }
+
+    func testParseSlashDateTime_twoDigitYear_70orGreater_treatedAs1900s() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone.current
+
+        let date70 = TimeFormat.parseSlashDateTime("70/01/01")
+        XCTAssertNotNil(date70)
+        XCTAssertEqual(calendar.component(.year, from: date70!), 1970)
+
+        let date99 = TimeFormat.parseSlashDateTime("99/12/31 23:59:59")
+        XCTAssertNotNil(date99)
+        XCTAssertEqual(calendar.component(.year, from: date99!), 1999)
+
+        let date85 = TimeFormat.parseSlashDateTime("85/07/04")
+        XCTAssertNotNil(date85)
+        XCTAssertEqual(calendar.component(.year, from: date85!), 1985)
+    }
+
+    func testParseSlashDateTime_fourDigitYear_unchanged() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone.current
+
+        let date2026 = TimeFormat.parseSlashDateTime("2026/03/10")
+        XCTAssertNotNil(date2026)
+        XCTAssertEqual(calendar.component(.year, from: date2026!), 2026)
+
+        let date1985 = TimeFormat.parseSlashDateTime("1985/07/04")
+        XCTAssertNotNil(date1985)
+        XCTAssertEqual(calendar.component(.year, from: date1985!), 1985)
+    }
+
+    func testParseAnyFormat_detectsEpochSeconds() {
+        let date = TimeFormat.parseAnyFormat("1704067200")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseAnyFormat_detectsEpochMilliseconds() {
+        let date = TimeFormat.parseAnyFormat("1704067200000")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(Int(date!.timeIntervalSince1970), 1704067200)
+    }
+
+    func testParseAnyFormat_detectsRFC3339() {
+        let date = TimeFormat.parseAnyFormat("2024-01-01T00:00:00.000Z")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseAnyFormat_detectsSQLDateTime() {
+        let date = TimeFormat.parseAnyFormat("2024-01-01 12:30:45")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseAnyFormat_detectsRFC1123() {
+        let date = TimeFormat.parseAnyFormat("Mon, 01 Jan 2024 00:00:00 GMT")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseAnyFormat_detectsSlashFormat() {
+        let date = TimeFormat.parseAnyFormat("2024/01/15 12:30:45")
+        XCTAssertNotNil(date)
+    }
+
+    func testParseAnyFormat_returnsNilForInvalidInput() {
+        XCTAssertNil(TimeFormat.parseAnyFormat("not a date"))
+        XCTAssertNil(TimeFormat.parseAnyFormat(""))
+        XCTAssertNil(TimeFormat.parseAnyFormat("   "))
+    }
+
+    // MARK: - Time Output Formatting
+
+    func testTimeOutputEpochSeconds() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.epochSeconds(from: date), "1704067200")
+    }
+
+    func testTimeOutputEpochMilliseconds() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.epochMilliseconds(from: date), "1704067200000")
+    }
+
+    func testTimeOutputSQLDateTimeUTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.sqlDateTimeUTC(from: date), "2024-01-01 00:00:00")
+    }
+
+    func testTimeOutputRFC3339Z() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        let result = TimeOutput.rfc3339Z(from: date)
+        XCTAssertTrue(result.hasSuffix("Z"))
+        XCTAssertTrue(result.hasPrefix("2024-01-01T00:00:00"))
+    }
+
+    func testTimeOutputRFC1123UTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.rfc1123UTC(from: date), "Mon, 01 Jan 2024 00:00:00 GMT")
+    }
+
+    func testTimeOutputYYYYMMDDUTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.yyyyMMddUTC(from: date), "2024/01/01")
+    }
+
+    func testTimeOutputYYYYMMDDHHmmssUTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.yyyyMMddHHmmssUTC(from: date), "2024/01/01 00:00:00")
+    }
+
+    func testTimeOutputYYYYMMDDHHUTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.yyyyMMddHHUTC(from: date), "2024/01/01/00")
+    }
+
+    func testTimeOutputYYMMDDUTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.yyMMddUTC(from: date), "24/01/01")
+    }
+
+    func testTimeOutputYYMMDDHHmmssUTC() {
+        let date = Date(timeIntervalSince1970: 1704067200)
+        XCTAssertEqual(TimeOutput.yyMMddHHmmssUTC(from: date), "24/01/01 00:00:00")
+    }
+
+    // MARK: - Time Transform Round-trips
+
+    func testTimeTransformEpochToRFC3339() {
+        let result = ClipboardTransform.timeToRFC3339Z("1704067200")
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result!.hasPrefix("2024-01-01T00:00:00"))
+    }
+
+    func testTimeTransformRFC3339ToEpoch() {
+        let result = ClipboardTransform.timeToEpochSeconds("2024-01-01T00:00:00.000Z")
+        XCTAssertEqual(result, "1704067200")
+    }
+
+    func testTimeTransformSQLToRFC3339() {
+        let result = ClipboardTransform.timeToRFC3339Z("2024-01-01 00:00:00")
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result!.contains("2024-01-01T"))
+    }
+
+    func testTimeTransformRFC1123ToEpoch() {
+        let result = ClipboardTransform.timeToEpochSeconds("Mon, 01 Jan 2024 00:00:00 GMT")
+        XCTAssertEqual(result, "1704067200")
+    }
+
+    func testTimeTransformSlashToEpoch() {
+        let result = ClipboardTransform.timeToEpochSeconds("2024/01/15 12:30:45")
+        XCTAssertNotNil(result)
+    }
+
+    func testTimeTransformInvalidInputReturnsNil() {
+        XCTAssertNil(ClipboardTransform.timeToEpochSeconds("not a date"))
+        XCTAssertNil(ClipboardTransform.timeToRFC3339Z("invalid"))
+        XCTAssertNil(ClipboardTransform.timeToSQLDateTimeLocal("garbage"))
+    }
+
+    func testTimeTransformEpochMillisecondsToFormats() {
+        let result = ClipboardTransform.timeToRFC3339Z("1704067200000")
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result!.hasPrefix("2024-01-01T00:00:00"))
+    }
+
+    func testTimeTransformToAllFormats() {
+        let epoch = "1704067200"
+
+        XCTAssertNotNil(ClipboardTransform.timeToEpochSeconds(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToEpochMilliseconds(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToSQLDateTimeLocal(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToSQLDateTimeUTC(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToRFC3339Z(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToRFC3339WithOffset(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToRFC3339WithAbbreviation(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToRFC1123Local(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToRFC1123UTC(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYYYMMDDHHmmssLocal(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYYYMMDDHHmmssUTC(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYMMDDHHmmssLocal(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYMMDDHHmmssUTC(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYYYMMDDLocal(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYYYMMDDUTC(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYYYMMDDHHLocal(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYYYMMDDHHUTC(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYMMDDLocal(epoch))
+        XCTAssertNotNil(ClipboardTransform.timeToYYMMDDUTC(epoch))
+    }
+
+    // MARK: - ClipboardSet Time Functions
+
+    func testClipboardSetEpochSeconds() {
+        let result = ClipboardSet.epochSeconds()
+        XCTAssertNotNil(Int(result))
+    }
+
+    func testClipboardSetEpochMilliseconds() {
+        let result = ClipboardSet.epochMilliseconds()
+        XCTAssertNotNil(Int64(result))
+        XCTAssertTrue(result.count >= 13)
+    }
+
+    func testClipboardSetSQLDateTimeFormats() {
+        let local = ClipboardSet.sqlDateTimeLocal()
+        let utc = ClipboardSet.sqlDateTimeUTC()
+        XCTAssertTrue(local.contains("-"))
+        XCTAssertTrue(local.contains(":"))
+        XCTAssertTrue(utc.contains("-"))
+        XCTAssertTrue(utc.contains(":"))
+    }
+
+    func testClipboardSetRFC3339Formats() {
+        let z = ClipboardSet.rfc3339Z()
+        let offset = ClipboardSet.rfc3339WithOffset()
+        let abbrev = ClipboardSet.rfc3339WithAbbreviation()
+        XCTAssertTrue(z.hasSuffix("Z"))
+        XCTAssertTrue(z.contains("T"))
+        XCTAssertTrue(offset.contains("T"))
+        XCTAssertTrue(abbrev.contains("T"))
+    }
+
+    func testClipboardSetRFC1123Formats() {
+        let local = ClipboardSet.rfc1123Local()
+        let utc = ClipboardSet.rfc1123UTC()
+        XCTAssertTrue(local.contains(","))
+        XCTAssertTrue(utc.hasSuffix("GMT"))
+    }
+
+    func testClipboardSetSlashFormats() {
+        let yyyymmddLocal = ClipboardSet.yyyyMMddLocal()
+        let yyyymmddUTC = ClipboardSet.yyyyMMddUTC()
+        let yyyymmddhhLocal = ClipboardSet.yyyyMMddHHLocal()
+        let yyyymmddhhUTC = ClipboardSet.yyyyMMddHHUTC()
+        let yyyymmddhhmmssLocal = ClipboardSet.yyyyMMddHHmmssLocal()
+        let yyyymmddhhmmssUTC = ClipboardSet.yyyyMMddHHmmssUTC()
+
+        XCTAssertTrue(yyyymmddLocal.contains("/"))
+        XCTAssertTrue(yyyymmddUTC.contains("/"))
+        XCTAssertTrue(yyyymmddhhLocal.contains("/"))
+        XCTAssertTrue(yyyymmddhhUTC.contains("/"))
+        XCTAssertTrue(yyyymmddhhmmssLocal.contains("/"))
+        XCTAssertTrue(yyyymmddhhmmssUTC.contains("/"))
+        XCTAssertTrue(yyyymmddhhmmssLocal.contains(":"))
+        XCTAssertTrue(yyyymmddhhmmssUTC.contains(":"))
+    }
+
+    func testClipboardSetYYFormats() {
+        let yymmddLocal = ClipboardSet.yyMMddLocal()
+        let yymmddUTC = ClipboardSet.yyMMddUTC()
+        let yymmddhhmmssLocal = ClipboardSet.yyMMddHHmmssLocal()
+        let yymmddhhmmssUTC = ClipboardSet.yyMMddHHmmssUTC()
+
+        XCTAssertTrue(yymmddLocal.contains("/"))
+        XCTAssertTrue(yymmddUTC.contains("/"))
+        XCTAssertEqual(yymmddLocal.split(separator: "/").first?.count, 2)
+        XCTAssertEqual(yymmddUTC.split(separator: "/").first?.count, 2)
+        XCTAssertTrue(yymmddhhmmssLocal.contains(":"))
+        XCTAssertTrue(yymmddhhmmssUTC.contains(":"))
     }
 
     // MARK: - ClipboardSet (Random: ULID, etc.)

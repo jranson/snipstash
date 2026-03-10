@@ -44,18 +44,25 @@ struct MenuBarView: View {
     #endif
 
     var body: some View {
-        Button("Analyze Clipboard Data") {
-            if let str = ClipboardIO.readString() {
-                editorStore.initialBody = str
-                editorStore.analyzeSessionId = UUID()
-                editorStore.editingSnippet = nil
-                editorStore.editorWindowTitle = "Clipboard Analysis"
-                openWindow(id: "editor")
-                DispatchQueue.main.async {
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-            }
+        Menu("Analyze Clipboard Data") {
+            Text("TODO: add analysis here")
+            Text("example Format: JSON Array")
+            Text("example # Elements: 47")
+            Text("example Format: General Text")
+            Text("example Word Count: 45")
         }
+        // Button("Analyze Clipboard Data") {
+        //     if let str = ClipboardIO.readString() {
+        //         editorStore.initialBody = str
+        //         editorStore.analyzeSessionId = UUID()
+        //         editorStore.editingSnippet = nil
+        //         editorStore.editorWindowTitle = "Clipboard Analysis"
+        //         openWindow(id: "editor")
+        //         DispatchQueue.main.async {
+        //             NSApp.activate(ignoringOtherApps: true)
+        //         }
+        //     }
+        // }
         Menu("Transform Clipboard Data") {
             Menu("General Text") {
                 Button("UPPERCASE") { transformClipboard(ClipboardTransform.uppercase) }
@@ -71,6 +78,32 @@ struct MenuBarView: View {
                 Button("kebab-case (slug)") { transformClipboard(ClipboardTransform.slugify) }
                 Button("snake_case") { transformClipboard(ClipboardTransform.snakeCase) }
                 Button("CONST_CASE") { transformClipboard(ClipboardTransform.constCase) }
+            }
+            Menu("Time") {
+                Button("→ Epoch (s)") { transformClipboardIfValid(ClipboardTransform.timeToEpochSeconds) }
+                Button("→ Epoch (ms)") { transformClipboardIfValid(ClipboardTransform.timeToEpochMilliseconds) }
+                Divider()
+                Button("→ SQL DateTime (Local)") { transformClipboardIfValid(ClipboardTransform.timeToSQLDateTimeLocal) }
+                Button("→ SQL DateTime (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToSQLDateTimeUTC) }
+                Divider()
+                Button("→ RFC3339 (Z)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339Z) }
+                Button("→ RFC3339 (+offset)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339WithOffset) }
+                Button("→ RFC3339 (tz abbrev)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339WithAbbreviation) }
+                Divider()
+                Button("→ RFC1123 (Local)") { transformClipboardIfValid(ClipboardTransform.timeToRFC1123Local) }
+                Button("→ RFC1123 (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToRFC1123UTC) }
+                Divider()
+                Button("→ YYYY/MM/DD hh:mm:ss (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHmmssLocal) }
+                Button("→ YYYY/MM/DD hh:mm:ss (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHmmssUTC) }
+                Button("→ YY/MM/DD hh:mm:ss (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDHHmmssLocal) }
+                Button("→ YY/MM/DD hh:mm:ss (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDHHmmssUTC) }
+                Divider()
+                Button("→ YYYY/MM/DD (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDLocal) }
+                Button("→ YYYY/MM/DD (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDUTC) }
+                Button("→ YYYY/MM/DD/HH (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHLocal) }
+                Button("→ YYYY/MM/DD/HH (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHUTC) }
+                Button("→ YY/MM/DD (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDLocal) }
+                Button("→ YY/MM/DD (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDUTC) }
             }
             Menu("URLs") {
                 Section("Extract") {
@@ -134,6 +167,7 @@ struct MenuBarView: View {
                     Button("Minify") { transformClipboard(ClipboardTransform.jsonMinify) }
                     Button("Sort Keys") { transformClipboard(ClipboardTransform.jsonSortKeys) }
                     Button("Strip Nulls") { transformClipboard(ClipboardTransform.jsonStripNulls) }
+                    Button("Strip Empty Strings") { transformClipboard(ClipboardTransform.jsonStripEmptyStrings) }
                     Button("Top-Level Keys") { transformClipboard(ClipboardTransform.jsonTopLevelKeys) }
                     Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
                     Button("Array → CSV") { transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv) }
@@ -202,13 +236,27 @@ struct MenuBarView: View {
             Menu("Time") {
                 Button("Epoch (s)") { setClipboardToEpochSeconds() }
                 Button("Epoch (ms)") { setClipboardToEpochMilliseconds() }
-                    Divider()
+                Divider()
                 Button("SQL DateTime (Local)") { setClipboardToSQLDateTimeLocal() }
                 Button("SQL DateTime (UTC)") { setClipboardToSQLDateTimeUTC() }
-                    Divider()
+                Divider()
                 Button("RFC3339 (Z)") { setClipboardToRFC3339Z() }
                 Button("RFC3339 (+offset)") { setClipboardToRFC3339WithOffset() }
                 Button("RFC3339 (tz abbrev)") { setClipboardToRFC3339WithAbbreviation() }
+                Divider()
+                Button("RFC1123 (UTC)") { setClipboardToRFC1123UTC() }
+                Divider()
+                Button("YYYY/MM/DD hh:mm:ss (Local)") { setClipboardToYYYYMMDDHHmmssLocal() }
+                Button("YYYY/MM/DD hh:mm:ss (UTC)") { setClipboardToYYYYMMDDHHmmssUTC() }
+                Button("YY/MM/DD hh:mm:ss (Local)") { setClipboardToYYMMDDHHmmssLocal() }
+                Button("YY/MM/DD hh:mm:ss (UTC)") { setClipboardToYYMMDDHHmmssUTC() }
+                Divider()
+                Button("YYYY/MM/DD (Local)") { setClipboardToYYYYMMDDLocal() }
+                Button("YYYY/MM/DD (UTC)") { setClipboardToYYYYMMDDUTC() }
+                Button("YYYY/MM/DD/HH (Local)") { setClipboardToYYYYMMDDHHLocal() }
+                Button("YYYY/MM/DD/HH (UTC)") { setClipboardToYYYYMMDDHHUTC() }
+                Button("YY/MM/DD (Local)") { setClipboardToYYMMDDLocal() }
+                Button("YY/MM/DD (UTC)") { setClipboardToYYMMDDUTC() }
             }
             Menu("Symbol") {
                 Menu("Typography") {
@@ -292,15 +340,15 @@ struct MenuBarView: View {
                     Button("Uppercase") { setClipboardToRandomUUID() }
                 }
                 Divider()
+                Button("ULID") { setClipboardToRandomULID() }
+                Button("NanoID") { setClipboardToRandomNanoID() }
+                Divider()
                 Section("Hex Strings") {
                     Button("6 Bytes / 12 Chr") { setClipboardToRandomHex(byteCount: 6) }
                     Button("8 Bytes / 16 Chr") { setClipboardToRandomHex(byteCount: 8) }
                     Button("16 Bytes / 32 Chr") { setClipboardToRandomHex(byteCount: 16) }
                     Button("32 Bytes / 64 Chr") { setClipboardToRandomHex(byteCount: 32) }
                 }
-                Divider()
-                Button("ULID") { setClipboardToRandomULID() }
-                Button("NanoID") { setClipboardToRandomNanoID() }
                 Divider()
                 Section("Generate Password") {
                     Button("Very Complex") { setClipboardToRandomVeryComplexPassword() }
@@ -427,6 +475,42 @@ struct MenuBarView: View {
     }
     private func setClipboardToRFC3339WithAbbreviation() {
         ClipboardSet.setAndNotify(ClipboardSet.rfc3339WithAbbreviation(), muted: muteSounds)
+    }
+    private func setClipboardToRFC1123Local() {
+        ClipboardSet.setAndNotify(ClipboardSet.rfc1123Local(), muted: muteSounds)
+    }
+    private func setClipboardToRFC1123UTC() {
+        ClipboardSet.setAndNotify(ClipboardSet.rfc1123UTC(), muted: muteSounds)
+    }
+    private func setClipboardToYYYYMMDDHHmmssLocal() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHmmssLocal(), muted: muteSounds)
+    }
+    private func setClipboardToYYYYMMDDHHmmssUTC() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHmmssUTC(), muted: muteSounds)
+    }
+    private func setClipboardToYYMMDDHHmmssLocal() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyMMddHHmmssLocal(), muted: muteSounds)
+    }
+    private func setClipboardToYYMMDDHHmmssUTC() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyMMddHHmmssUTC(), muted: muteSounds)
+    }
+    private func setClipboardToYYYYMMDDLocal() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddLocal(), muted: muteSounds)
+    }
+    private func setClipboardToYYYYMMDDUTC() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddUTC(), muted: muteSounds)
+    }
+    private func setClipboardToYYYYMMDDHHLocal() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHLocal(), muted: muteSounds)
+    }
+    private func setClipboardToYYYYMMDDHHUTC() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHUTC(), muted: muteSounds)
+    }
+    private func setClipboardToYYMMDDLocal() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyMMddLocal(), muted: muteSounds)
+    }
+    private func setClipboardToYYMMDDUTC() {
+        ClipboardSet.setAndNotify(ClipboardSet.yyMMddUTC(), muted: muteSounds)
     }
     private func setClipboardToRandomUUID() {
         ClipboardSet.setAndNotify(ClipboardSet.randomUUID(), muted: muteSounds)
