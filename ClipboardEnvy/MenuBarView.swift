@@ -1107,6 +1107,7 @@ struct MenuBarView: View {
     private func copyToClipboard(_ snippet: Snippet) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(snippet.body, forType: .string)
+        ClipboardSound.playClipboardWritten(muted: muteSounds)
     }
 
     private func moveUp(_ snippet: Snippet) {
