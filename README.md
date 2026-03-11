@@ -29,6 +29,8 @@ In addition to developer tools, Clipboard Envy is great for the average user to 
 
 ## Screenshots
 
+<img src="assets/screenshot-clipboard-analysis.png" alt="Clipboard Analysis window showing text stats (chars, words, lines, em dashes) and Close / Edit Snippet buttons" width="875" />
+
 <img src="assets/screenshot-open-url-snippet.png" alt="Clipboard Envy menu with snippet submenu showing Copy to Clipboard, Open URL, Edit, Delete, Move Up, Move Down" width="875" />
 
 <img src="assets/screenshot-transform-jwt-decode.png" alt="Transform Clipboard Data submenus: JWT Decode" width="875" />
@@ -42,8 +44,6 @@ In addition to developer tools, Clipboard Envy is great for the average user to 
 <img src="assets/screenshot-set-data-ulid.png" alt="Set Clipboard Data submenu: > ULID" width="875" />
 
 <img src="assets/screenshot-set-data-lorem-ipsum.png" alt="Set Clipboard Data submenu: > ULID" width="875" />
-
-<img src="assets/screenshot-clipboard-analysis.png" alt="Clipboard Analysis window showing text stats (chars, words, lines, em dashes) and Close / Edit Snippet buttons" width="875" />
 
 ## Privacy
 
