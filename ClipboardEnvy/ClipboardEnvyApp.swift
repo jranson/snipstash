@@ -52,7 +52,7 @@ struct ClipboardEnvyApp: App {
         })
         .modelContainer(Self.sharedModelContainer)
 
-        Window(editorStore.editorWindowTitle, id: "editor") {
+        Window("Snippet Editor", id: "editor") {
             EditorWindowRoot()
                 .environmentObject(editorStore)
                 .environmentObject(snippetsStore)

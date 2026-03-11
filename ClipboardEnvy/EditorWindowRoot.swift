@@ -9,15 +9,11 @@ struct EditorWindowRoot: View {
     @EnvironmentObject private var snippetsStore: SnippetsStore
     @AppStorage("muteQuickSaveSounds") private var muteSounds = false
     @State private var escapeMonitor: Any? = nil
-    
-    private var isAnalyzeMode: Bool {
-        editorStore.editingSnippet == nil && editorStore.analyzeSessionId != nil
-    }
 
     var body: some View {
         Group {
             if let snippet = editorStore.editingSnippet {
-                SnippetEditorView(snippet: snippet, initialBody: nil, onSave: { body, title in
+                SnippetEditorView(snippet: snippet, onSave: { body, title in
                     saveSnippet(snippet: snippet, body: body, title: title)
                     dismiss()
                 }, onSaveAndSetClipboard: { body, title in
@@ -29,7 +25,7 @@ struct EditorWindowRoot: View {
                 })
                 .id(snippet.id)
             } else {
-                SnippetEditorView(snippet: nil, initialBody: editorStore.initialBody, onSave: { body, title in
+                SnippetEditorView(snippet: nil, onSave: { body, title in
                     let new = Snippet(body: body, title: title, timestamp: Date())
                     modelContext.insert(new)
                     snippetsStore.refresh()
@@ -43,29 +39,18 @@ struct EditorWindowRoot: View {
                 }, onCancel: {
                     dismiss()
                 })
-                .id(editorStore.analyzeSessionId?.uuidString ?? "new")
-                .onAppear {
-                    if editorStore.editingSnippet == nil {
-                        editorStore.initialBody = nil
-                    }
-                }
+                .id("new")
             }
         }
         .onAppear {
-            updateWindowTitle()
+            setWindowTitle()
             escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 guard event.keyCode == 53 else { return event } // Escape
                 let t = NSApp.keyWindow?.title ?? ""
-                guard t == "Snippet Editor" || t == "Clipboard Analysis" else { return event }
+                guard t == "Snippet Editor" else { return event }
                 Task { @MainActor in dismiss() }
                 return nil
             }
-        }
-        .onChange(of: editorStore.editingSnippet?.id) { _, _ in
-            updateWindowTitle()
-        }
-        .onChange(of: editorStore.analyzeSessionId) { _, _ in
-            updateWindowTitle()
         }
         .onDisappear {
             if let m = escapeMonitor {
@@ -86,12 +71,10 @@ struct EditorWindowRoot: View {
         ClipboardSound.playClipboardWritten(muted: muteSounds)
     }
 
-    private func updateWindowTitle() {
-        let title = isAnalyzeMode ? "Clipboard Analysis" : "Snippet Editor"
-        editorStore.editorWindowTitle = title
+    private func setWindowTitle() {
         DispatchQueue.main.async {
-            NSApp.keyWindow?.title = title
-            NSApp.mainWindow?.title = title
+            NSApp.keyWindow?.title = "Snippet Editor"
+            NSApp.mainWindow?.title = "Snippet Editor"
         }
     }
 }

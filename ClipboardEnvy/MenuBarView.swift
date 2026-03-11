@@ -274,19 +274,8 @@ struct MenuBarView: View {
                 }
             }
         }
-        // Button("Analyze Clipboard Data") {
-        //     if let str = ClipboardIO.readString() {
-        //         editorStore.initialBody = str
-        //         editorStore.analyzeSessionId = UUID()
-        //         editorStore.editingSnippet = nil
-        //         editorStore.editorWindowTitle = "Clipboard Analysis"
-        //         openWindow(id: "editor")
-        //         DispatchQueue.main.async {
-        //             NSApp.activate(ignoringOtherApps: true)
-        //         }
-        //     }
-        // }
-        Menu("Transform Clipboard Data") {
+        if clipboardAnalysis.dataType != .nonText {
+            Menu("Transform Clipboard Data") {
             if showSuggestions {
                 Menu("Suggestions ✨") {
                     if clipboardAnalysis.dataType == .jwt {
@@ -650,6 +639,7 @@ struct MenuBarView: View {
                 #endif
             }
         }
+        }
         Menu("Set Clipboard Data") {
             Menu("Time") {
                 Button("Epoch (s)") { setClipboardToEpochSeconds() }
@@ -788,9 +778,6 @@ struct MenuBarView: View {
         Divider()
         Button("New Snippet") {
             editorStore.editingSnippet = nil
-            editorStore.initialBody = nil
-            editorStore.analyzeSessionId = nil
-            editorStore.editorWindowTitle = "Snippet Editor"
             openWindow(id: "editor")
             DispatchQueue.main.async {
                 NSApp.activate(ignoringOtherApps: true)
@@ -809,7 +796,6 @@ struct MenuBarView: View {
                     }
                     Button("Edit") {
                         editorStore.editingSnippet = snippet
-                        editorStore.editorWindowTitle = "Snippet Editor"
                         openWindow(id: "editor")
                         DispatchQueue.main.async {
                             NSApp.activate(ignoringOtherApps: true)

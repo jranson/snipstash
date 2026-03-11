@@ -2,17 +2,13 @@ import SwiftUI
 import SwiftData
 
 struct SnippetEditorView: View {
-    @EnvironmentObject private var editorStore: EditorStore
     let snippet: Snippet?
-    let initialBody: String?
     let onSave: (String, String?) -> Void
     let onSaveAndSetClipboard: ((String, String?) -> Void)?
     let onCancel: () -> Void
 
     @State private var text: String
     @State private var title: String
-    /// True when opened via "Analyze Clipboard": title hidden, body read-only, Close / Edit Snippet.
-    @State private var isAnalyzeMode: Bool
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -32,100 +28,77 @@ struct SnippetEditorView: View {
         text.unicodeScalars.filter { $0 == "\u{2014}" }.count
     }
 
-    init(snippet: Snippet?, initialBody: String? = nil, onSave: @escaping (String, String?) -> Void, onSaveAndSetClipboard: ((String, String?) -> Void)? = nil, onCancel: @escaping () -> Void) {
+    init(snippet: Snippet?, onSave: @escaping (String, String?) -> Void, onSaveAndSetClipboard: ((String, String?) -> Void)? = nil, onCancel: @escaping () -> Void) {
         self.snippet = snippet
-        self.initialBody = initialBody
         self.onSave = onSave
         self.onSaveAndSetClipboard = onSaveAndSetClipboard
         self.onCancel = onCancel
-        _text = State(initialValue: snippet?.body ?? initialBody ?? "")
+        _text = State(initialValue: snippet?.body ?? "")
         _title = State(initialValue: snippet?.title ?? "")
-        _isAnalyzeMode = State(initialValue: snippet == nil && initialBody != nil)
     }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 12) {
-            if !isAnalyzeMode {
-                TextField("Title", text: $title)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 14))
-                    .frame(maxWidth: .infinity)
-                    .focused($focusedField, equals: .title)
-                    .onKeyPress(.tab) {
-                        focusedField = .body
-                        return .handled
-                    }
-            }
+            TextField("Title", text: $title)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 14))
+                .frame(maxWidth: .infinity)
+                .focused($focusedField, equals: .title)
+                .onKeyPress(.tab) {
+                    focusedField = .body
+                    return .handled
+                }
             TextEditor(text: $text)
                 .font(.system(size: 14))
-                .foregroundStyle(isAnalyzeMode ? Color(nsColor: .tertiaryLabelColor) : Color(nsColor: .textColor))
+                .foregroundStyle(Color(nsColor: .textColor))
                 .frame(maxWidth: .infinity, minHeight: 400)
                 .border(Color.secondary.opacity(0.3))
-                .background(isAnalyzeMode ? Color(nsColor: .controlBackgroundColor) : Color(NSColor.textBackgroundColor))
+                .background(Color(NSColor.textBackgroundColor))
                 .focused($focusedField, equals: .body)
-                .disabled(isAnalyzeMode)
                 .onKeyPress(.tab) {
-                    if !isAnalyzeMode { focusedField = .title }
+                    focusedField = .title
                     return .handled
                 }
             HStack(alignment: .center, spacing: 10) {
                 HStack(spacing: 16) {
                     Text("Chars: \(characterCount)")
-                        .font(isAnalyzeMode ? .system(size: 17, weight: .bold) : .system(size: 14))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Text("Words: \(wordCount)")
-                        .font(isAnalyzeMode ? .system(size: 17, weight: .bold) : .system(size: 14))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Text("Lines: \(lineCount)")
-                        .font(isAnalyzeMode ? .system(size: 17, weight: .bold) : .system(size: 14))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Text("Em dashes: \(emdashCount)")
-                        .font(isAnalyzeMode ? .system(size: 17, weight: .bold) : .system(size: 14))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                if isAnalyzeMode {
-                    Button("Close") { onCancel() }
+                Button("Cancel") { onCancel() }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+                    .keyboardShortcut(.escape)
+                    .buttonHoverBrightness()
+                Button("Save Snippet") {
+                    save()
+                }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+                    .keyboardShortcut(.return, modifiers: [.command])
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .buttonHoverBrightness()
+                if let onSaveAndSetClipboard {
+                    Button("Save Snippet + Set Clipboard") {
+                        onSaveAndSetClipboard(text, trimmedTitle())
+                    }
                         .buttonStyle(.bordered)
                         .buttonBorderShape(.capsule)
                         .controlSize(.large)
-                        .keyboardShortcut(.escape)
-                        .buttonHoverBrightness()
-                    Button("Edit Snippet") {
-                        isAnalyzeMode = false
-                        editorStore.editorWindowTitle = "Snippet Editor"
-                        focusedField = .body
-                    }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.large)
-                        .buttonHoverBrightness()
-                } else {
-                    Button("Cancel") { onCancel() }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.large)
-                        .keyboardShortcut(.escape)
-                        .buttonHoverBrightness()
-                    Button("Save Snippet") {
-                        save()
-                    }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.large)
-                        .keyboardShortcut(.return, modifiers: [.command])
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .buttonHoverBrightness()
-                    if let onSaveAndSetClipboard {
-                        Button("Save Snippet + Set Clipboard") {
-                            onSaveAndSetClipboard(text, trimmedTitle())
-                        }
-                            .buttonStyle(.bordered)
-                            .buttonBorderShape(.capsule)
-                            .controlSize(.large)
-                            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .buttonHoverBrightness()
-                    }
                 }
             }
         }
@@ -166,7 +139,6 @@ private extension View {
 }
 
 #Preview {
-    SnippetEditorView(snippet: nil, initialBody: nil, onSave: { _, _ in }, onSaveAndSetClipboard: nil, onCancel: { })
-        .environmentObject(EditorStore())
+    SnippetEditorView(snippet: nil, onSave: { _, _ in }, onSaveAndSetClipboard: nil, onCancel: { })
         .modelContainer(for: Snippet.self, inMemory: true)
 }
