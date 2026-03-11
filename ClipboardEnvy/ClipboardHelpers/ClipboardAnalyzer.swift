@@ -207,7 +207,7 @@ enum ClipboardAnalyzer {
                     analysis.set(displayKey, stringValue)
                 } else if let numValue = value as? NSNumber {
                     if isTimestampClaim(key), let date = dateFromTimestamp(numValue) {
-                        analysis.set(displayKey, formatTimestamp(date))
+                        analysis.set(displayKey, formatTimestampLocal(date))
                     } else {
                         analysis.set(displayKey, "\(numValue)")
                     }
@@ -268,7 +268,8 @@ enum ClipboardAnalyzer {
         var analysis = ClipboardAnalysis(dataType: .time)
         addTextMetrics(to: &analysis, text: original)
         analysis.set("Detected Format", formatName)
-        analysis.set("Parsed Value", formatTimestamp(date))
+        analysis.set("Local", formatTimestampLocal(date))
+        analysis.set("UTC", formatTimestampUTC(date))
 
         return analysis
     }
@@ -603,9 +604,17 @@ enum ClipboardAnalyzer {
         return Date(timeIntervalSince1970: value)
     }
 
-    private static func formatTimestamp(_ date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+    private static func formatTimestampLocal(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = .current
+        return formatter.string(from: date)
+    }
+
+    private static func formatTimestampUTC(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter.string(from: date)
     }
 
