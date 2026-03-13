@@ -8,7 +8,7 @@ Note: The App Store may temporarily reflect the app's old name, SnipStash.
 
 ## About
 
-Clipboard Envy lives in your Menu Bar so you can capture, store, transform, and recall text snippets without leaving your workflow. It's ideal for Devlopers who use tools like JWT Decoders, SHA-1 Hashers, JSON Minifiers, etc. We have over 100 built-in tools, organized in a coherent, easy-access Menu.
+Clipboard Envy lives in your Menu Bar so you can capture, store, transform, and recall text snippets without leaving your workflow. It's ideal for developers who use tools like JWT Decoders, SHA-1 Hashers, JSON Minifiers, etc. We have over 100 built-in tools, organized in a coherent, easy-access Menu.
 
 In addition to developer tools, Clipboard Envy is great for the average user to do things like:
 - Quickly capture snippets that you don't want to lose, like tracking numbers
@@ -25,7 +25,7 @@ In addition to developer tools, Clipboard Envy is great for the average user to 
 - **Transform Clipboard Data** - Developer-friendly one-click transformations like convert clipboard contents to lowercase, prettify/minify JSON, Base64-encode/decode, sort and de-duplicate lines, and more!
 - **Set Clipboard Data** - One-click to set the clipboard contents to the current epoch timestamp, random values like generated passwords or UUIDs, filler text like Lorem Ipsum, and common symbols that aren't on most keyboards.
 - **Analyze Clipboard** - Reveals the number of lines, words, characters and em dashes in the clipboard.
-- **Persistent storage** — Clipboard Envy snippet data is stored locally (sorry no cloud syncing!).
+- **Persistent storage** — Clipboard Envy snippet data is stored locally (sorry, no cloud syncing!).
 
 ## Screenshots
 
@@ -43,7 +43,7 @@ In addition to developer tools, Clipboard Envy is great for the average user to 
 
 <img src="assets/screenshot-set-data-ulid.png" alt="Set Clipboard Data submenu: > ULID" width="875" />
 
-<img src="assets/screenshot-set-data-lorem-ipsum.png" alt="Set Clipboard Data submenu: > ULID" width="875" />
+<img src="assets/screenshot-set-data-lorem-ipsum.png" alt="Set Clipboard Data submenu: > Lorem Ipsum" width="875" />
 
 ## Privacy
 
