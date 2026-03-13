@@ -30,7 +30,9 @@ extension ClipboardTransform {
     }
 
     nonisolated static func urlDecode(_ s: String) -> String {
-        s.removingPercentEncoding ?? s
+        // Treat '+' as space for typical x-www-form-urlencoded bodies before percent-decoding.
+        let plusAsSpace = s.replacingOccurrences(of: "+", with: " ")
+        return plusAsSpace.removingPercentEncoding ?? plusAsSpace
     }
 
     nonisolated static func urlExtractHostIfValid(_ s: String) -> String? {

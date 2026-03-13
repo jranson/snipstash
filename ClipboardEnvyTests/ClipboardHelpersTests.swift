@@ -128,6 +128,12 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(ClipboardTransform.urlDecode(ClipboardTransform.urlEncode(s)), "a b+c")
     }
 
+    func testUrlDecodePlusToSpace() {
+        // For typical x-www-form-urlencoded bodies, '+' should decode to space.
+        XCTAssertEqual(ClipboardTransform.urlDecode("hello+world"), "hello world")
+        XCTAssertEqual(ClipboardTransform.urlDecode("a+b+c"), "a b c")
+    }
+
     func testUrlExtractHostIfValid() {
         // With port in URL: Host returns host only (no port).
         XCTAssertEqual(ClipboardTransform.urlExtractHostIfValid("https://google.com:8443/some/path?param1=val1"), "google.com")

@@ -805,6 +805,26 @@ struct MenuBarView: View {
                 Button("Waltz, Bad Nymph") { setClipboardTo(ClipboardSet.waltzBadNymphPlaceholder) }
                 Button("Jackdaws") { setClipboardTo(ClipboardSet.jackdawsPlaceholder) }
             }
+            if shouldShowAll {
+                Divider()
+                Menu("Test Data") {
+                    Button("JSON Array") { setClipboardTo(TestData.jsonArray) }
+                    Button("JSON Object") { setClipboardTo(TestData.jsonObject) }
+                    Button("CSV") { setClipboardTo(TestData.csv) }
+                    Button("TSV") { setClipboardTo(TestData.tsv) }
+                    Button("PSV") { setClipboardTo(TestData.psv) }
+                    Button("YAML") { setClipboardTo(TestData.yaml) }
+                    Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
+                    Button("JWT") { setClipboardTo(TestData.jwt) }
+                    Button("Base64") { setClipboardTo(TestData.base64) }
+                    Button("Base64 URL") { setClipboardTo(TestData.base64URL) }
+                    Button("URL-encoded") { setClipboardTo(TestData.urlEncoded) }
+                    Button("Plain text") { setClipboardTo(TestData.plainText) }
+                    Button("MySQL CLI Table") { setClipboardTo(TestData.mysqlCLI) }
+                    Button("psql CLI Table") { setClipboardTo(TestData.psqlCLI) }
+                    Button("sqlite3 CLI Table") { setClipboardTo(TestData.sqlite3CLI) }
+                }
+            }
         }
         Divider()
         Button("New Snippet") {
@@ -899,7 +919,7 @@ struct MenuBarView: View {
 
     private func refreshClipboardAnalysis() {
         let modifiers = NSEvent.modifierFlags
-        shouldShowAll = modifiers.contains(.shift) || modifiers.contains(.option)
+        shouldShowAll = modifiers.contains(.option)
         let clipboardText = ClipboardIO.readString()
         clipboardAnalysis = ClipboardAnalyzer.analyze(clipboardText)
 
