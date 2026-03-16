@@ -30,8 +30,13 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          printf 'MARKETING_VERSION = %s\nINFOPLIST_KEY_NSHumanReadableCopyright = Copyright © 2026 Centennial OSS\n' "$VERSION" > Clipboard Envy/Version.xcconfig
+          {
+            printf 'MARKETING_VERSION = %s\n' "$VERSION"
+            printf 'CURRENT_PROJECT_VERSION = %s\n' "$BUILD_NUMBER"
+            printf 'INFOPLIST_KEY_NSHumanReadableCopyright = Copyright © 2026 Centennial OSS\n'
+          } > "Clipboard Envy/Version.xcconfig"
 
       - name: Generate build info
         run: |
@@ -111,6 +116,32 @@ jobs:
           cd build/Build/Products/Release
           zip -r "ClipboardEnvy-${VERSION}-macOS-universal.zip" "Clipboard Envy.app"
           mv "ClipboardEnvy-${VERSION}-macOS-universal.zip" "$GITHUB_WORKSPACE/"
+
+      - name: Archive for Mac App Store
+        run: |
+          xcodebuild archive \
+            -scheme ClipboardEnvy \
+            -configuration Release \
+            -archivePath build/ClipboardEnvy.xcarchive \
+            -destination 'generic/platform=macOS'
+
+      - name: Export Mac App Store package
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/ClipboardEnvy.xcarchive \
+            -exportPath build/AppStoreExport \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Upload to App Store Connect
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          xcrun altool --upload-app \
+            -f "build/AppStoreExport/Clipboard Envy.pkg" \
+            -t osx \
+            -u "$APPLE_ID" \
+            -p "$APPLE_APP_SPECIFIC_PASSWORD"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
