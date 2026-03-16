@@ -21,6 +21,8 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_SIGNING_CERT_PREFIX: ${{ vars.APP_SIGNING_CERT_PREFIX || '3rd Party Mac Developer Application' }}
+      INSTALLER_SIGNING_CERT_PREFIX: ${{ vars.INSTALLER_SIGNING_CERT_PREFIX || '3rd Party Mac Developer Installer' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +67,37 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
             -k "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
 
+      - name: Verify imported signing identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          security find-identity -v -p basic "$KEYCHAIN_PATH"
+
+      - name: Resolve signing identities from prefixes
+        id: signing_identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          IDENTITIES="$(security find-identity -v -p basic "$KEYCHAIN_PATH")"
+
+          APP_IDENTITY="$(printf '%s\n' "$IDENTITIES" | awk -v p="$APP_SIGNING_CERT_PREFIX" -F'"' '$0 ~ p {print $2; exit}')"
+          INSTALLER_IDENTITY="$(printf '%s\n' "$IDENTITIES" | awk -v p="$INSTALLER_SIGNING_CERT_PREFIX" -F'"' '$0 ~ p {print $2; exit}')"
+
+          if [ -z "$APP_IDENTITY" ]; then
+            echo "Could not find app signing identity with prefix: $APP_SIGNING_CERT_PREFIX"
+            exit 1
+          fi
+          if [ -z "$INSTALLER_IDENTITY" ]; then
+            echo "Could not find installer signing identity with prefix: $INSTALLER_SIGNING_CERT_PREFIX"
+            exit 1
+          fi
+
+          echo "Resolved app signing identity: $APP_IDENTITY"
+          echo "Resolved installer signing identity: $INSTALLER_IDENTITY"
+          echo "app_identity=$APP_IDENTITY" >> "$GITHUB_OUTPUT"
+          echo "installer_identity=$INSTALLER_IDENTITY" >> "$GITHUB_OUTPUT"
+
       - name: Write App Store Connect API key
         id: asc_key
         shell: bash
@@ -98,6 +131,8 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="${{ steps.signing_identity.outputs.app_identity }}" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
             ARCHS="arm64 x86_64" \
             ONLY_ACTIVE_ARCH=NO \
             clean archive
