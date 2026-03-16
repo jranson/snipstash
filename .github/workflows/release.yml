@@ -56,19 +56,25 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             clean build
 
-      - name: Import signing certificate
+      - name: Import signing certificates
         env:
-          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_DEVID_CERT_BASE64: ${{ secrets.APPLE_DEVID_CERT_BASE64 }}
+          APPLE_DIST_APP_CERT_BASE64: ${{ secrets.APPLE_DIST_APP_CERT_BASE64 }}
+          APPLE_DIST_INSTALLER_CERT_BASE64: ${{ secrets.APPLE_DIST_INSTALLER_CERT_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          echo "$APPLE_DEVID_CERT_BASE64" | base64 --decode > devid.p12
+          echo "$APPLE_DIST_APP_CERT_BASE64" | base64 --decode > dist_app.p12
+          echo "$APPLE_DIST_INSTALLER_CERT_BASE64" | base64 --decode > dist_installer.p12
+          for p12 in devid.p12 dist_app.p12 dist_installer.p12; do
+            security import "$p12" -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          done
+          rm devid.p12 dist_app.p12 dist_installer.p12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm certificate.p12
 
       - name: Code sign app
         env:
@@ -124,7 +130,10 @@ jobs:
             -scheme ClipboardEnvy \
             -configuration Release \
             -archivePath build/ClipboardEnvy.xcarchive \
-            -destination 'generic/platform=macOS'
+            -destination 'generic/platform=macOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Export Mac App Store package
         run: |
