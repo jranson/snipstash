@@ -1,4 +1,7 @@
-.PHONY: build build-release generate-appicons test
+.PHONY: build build-release generate-appicons test clean
+
+clean:
+	rm -rf build dist
 
 # App icon pipeline:
 #   1. Composite assets/app-icon-large-transparent.png over assets/app-icon-background-large.png → assets/app-icon-large.png
