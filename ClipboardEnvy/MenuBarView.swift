@@ -161,12 +161,17 @@ struct MenuBarView: View {
     }
 
     private var showCSVMenu: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .csv || clipboardAnalysis.dataType == .tsv || clipboardAnalysis.dataType == .psv
+        shouldShowAll || clipboardAnalysis.dataType == .csv || clipboardAnalysis.dataType == .tsv || clipboardAnalysis.dataType == .psv || clipboardAnalysis.dataType == .fixedWidthTable
     }
 
     private var csvMenuLabel: String {
         if shouldShowAll { return "CSV" }
         switch clipboardAnalysis.dataType {
+        case .fixedWidthTable:
+            if let tableName = clipboardAnalysis.tableTypeName {
+                return "\(tableName) ✨"
+            }
+            return "Table ✨"
         case .csv: return "CSV ✨"
         case .tsv: return "TSV ✨"
         case .psv: return "PSV ✨"
@@ -465,6 +470,44 @@ struct MenuBarView: View {
                     Button("Reverse Lines") { transformClipboard(ClipboardTransform.reverseLines) }
                     Button("Shuffle Lines") { transformClipboard(ClipboardTransform.shuffleLines) }
                     Divider()
+                    Menu("Remove") {
+                        let counts = ClipboardTransform.multilineRemoveValues()
+                        Section("First") {
+                            ForEach(counts, id: \.self) { n in
+                                let label = n == 1 ? "First Line" : "First \(n) Lines"
+                                Button(label) {
+                                    transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
+                                }
+                            }
+                        }
+                        Divider()
+                        Section("Last") {
+                            ForEach(counts, id: \.self) { n in
+                                let label = n == 1 ? "Last Line" : "Last \(n) Lines"
+                                Button(label) {
+                                    transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
+                                }
+                            }
+                        }
+                    }
+                    Menu("Head") {
+                        let counts = ClipboardTransform.multilineRemoveValues()
+                        ForEach(counts, id: \.self) { n in
+                            let label = n == 1 ? "1 Line" : "\(n) Lines"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.headLines($0, count: n) }
+                            }
+                        }
+                    }
+                    Menu("Tail") {
+                        let counts = ClipboardTransform.multilineRemoveValues()
+                        ForEach(counts, id: \.self) { n in
+                            let label = n == 1 ? "1 Line" : "\(n) Lines"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.tailLines($0, count: n) }
+                            }
+                        }
+                    }
                     Button("Indent Lines") { transformClipboard(ClipboardTransform.indentLines) }
                     Button("Un-indent Lines") { transformClipboard(ClipboardTransform.unindentLines) }
                     Button("Trim Lines") { transformClipboard(ClipboardTransform.trimLines) }
@@ -527,6 +570,7 @@ struct MenuBarView: View {
                             Button("→ JSON (strings)") { transformClipboardIfValid(ClipboardTransform.csvToJsonStrings) }
                             Button("→ Tab-separated") { transformClipboard(ClipboardTransform.csvToTsv) }
                             Button("→ Pipe-separated") { transformClipboard(ClipboardTransform.csvToPsv) }
+                            Button("→ Fixed-Width Table") { transformClipboardIfValid(ClipboardTransform.csvToFixedWidthTable) }
                         }
                     }
                     if showCSVSection && showTSVPSVSection {
@@ -540,6 +584,14 @@ struct MenuBarView: View {
                             if showPSVToCsv {
                                 Button("PSV → CSV") { transformClipboardIfValid(ClipboardTransform.psvToCsv) }
                             }
+                        }
+                    }
+                    if clipboardAnalysis.dataType == .fixedWidthTable || shouldShowAll {
+                        Divider()
+                        Section("Fixed-Width Table") {
+                            Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToCsv) }
+                            Button("Table → JSON (typed)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJson) }
+                            Button("Table → JSON (strings)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJsonStrings) }
                         }
                     }
                     if showColumnsSection {
@@ -814,6 +866,7 @@ struct MenuBarView: View {
                     Button("TSV") { setClipboardTo(TestData.tsv) }
                     Button("PSV") { setClipboardTo(TestData.psv) }
                     Button("YAML") { setClipboardTo(TestData.yaml) }
+                    Button("Fixed-Width (Docker ps)") { setClipboardTo(TestData.fixedWidthDockerContainers) }
                     Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
                     Button("JWT") { setClipboardTo(TestData.jwt) }
                     Button("Base64") { setClipboardTo(ClipboardTransform.base64Encode(TestData.plainText)) }

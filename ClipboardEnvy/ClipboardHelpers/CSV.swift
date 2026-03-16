@@ -74,6 +74,122 @@ extension ClipboardTransform {
         parseCSVRows(s).map { makeDelimitedLine($0, delimiter: "\t") }.joined(separator: "\n")
     }
 
+    // MARK: - Fixed-Width Tables
+
+    /// Parses a simple fixed-width, space-aligned table (no borders) into rows of columns.
+    /// Uses runs of 2+ spaces as delimiters, mirroring ClipboardAnalyzer's detection heuristic.
+    nonisolated static func fixedWidthTableRows(_ s: String) -> [[String]] {
+        let unix = windowsNewlinesToUnix(s)
+        let lines = unix.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !lines.isEmpty else { return [] }
+
+        func split(_ line: String) -> [String] {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return [] }
+            let nsLine = trimmed as NSString
+            let pattern = "\\s{2,}"
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+                return trimmed.components(separatedBy: .whitespaces)
+            }
+
+            let range = NSRange(location: 0, length: nsLine.length)
+            var lastEnd = 0
+            var fields: [String] = []
+
+            regex.enumerateMatches(in: trimmed, options: [], range: range) { match, _, _ in
+                guard let match = match else { return }
+                let fieldRange = NSRange(location: lastEnd, length: match.range.location - lastEnd)
+                let field = nsLine.substring(with: fieldRange).trimmingCharacters(in: .whitespaces)
+                if !field.isEmpty {
+                    fields.append(field)
+                }
+                lastEnd = match.range.location + match.range.length
+            }
+
+            if lastEnd < nsLine.length {
+                let tailRange = NSRange(location: lastEnd, length: nsLine.length - lastEnd)
+                let tail = nsLine.substring(with: tailRange).trimmingCharacters(in: .whitespaces)
+                if !tail.isEmpty {
+                    fields.append(tail)
+                }
+            }
+
+            return fields
+        }
+
+        let header = split(lines[0])
+        guard !header.isEmpty else { return [] }
+
+        let dataRows = lines.dropFirst().map { split($0) }
+        let normalizedRows: [[String]] = dataRows.map { row in
+            if row.count == header.count { return row }
+            if row.count < header.count {
+                return row + Array(repeating: "", count: header.count - row.count)
+            }
+            return Array(row.prefix(header.count))
+        }
+
+        return [header] + normalizedRows
+    }
+
+    /// Converts a fixed-width table to CSV, normalizing NULL-like tokens to empty cells.
+    nonisolated static func fixedWidthTableToCsv(_ s: String) throws -> String {
+        let rows = fixedWidthTableRows(s)
+        guard let headers = rows.first, !headers.isEmpty, rows.count >= 2 else {
+            throw TransformError(description: "Table → CSV failed: expected a header row plus at least one data row.")
+        }
+        guard rows.allSatisfy({ $0.count == headers.count }) else {
+            throw TransformError(description: "Table → CSV failed: one or more rows have a different number of columns than the header.")
+        }
+        return csvString(from: rows, nullsAsEmpty: true)
+    }
+
+    /// Converts a fixed-width table to a typed JSON array via CSV.
+    nonisolated static func fixedWidthTableToJson(_ s: String) throws -> String {
+        let csv = try fixedWidthTableToCsv(s)
+        return try csvToJson(csv)
+    }
+
+    /// Converts a fixed-width table to a stringly-typed JSON array via CSV.
+    nonisolated static func fixedWidthTableToJsonStrings(_ s: String) throws -> String {
+        let csv = try fixedWidthTableToCsv(s)
+        return try csvToJsonStrings(csv)
+    }
+
+    /// Converts CSV to a simple fixed-width table, padding columns to the maximum width seen.
+    nonisolated static func csvToFixedWidthTable(_ s: String) throws -> String {
+        let rows = parseCSVRows(s)
+        guard let header = rows.first, !header.isEmpty else {
+            throw TransformError(description: "CSV → Table failed: no CSV header row was found.")
+        }
+        let allRows = rows
+        let columnCount = header.count
+        var widths = Array(repeating: 0, count: columnCount)
+
+        for row in allRows {
+            for (idx, value) in row.enumerated() where idx < columnCount {
+                let length = value.count
+                if length > widths[idx] {
+                    widths[idx] = length
+                }
+            }
+        }
+
+        func pad(_ value: String, to width: Int) -> String {
+            let count = value.count
+            if count >= width { return value }
+            return value + String(repeating: " ", count: width - count)
+        }
+
+        let lines = allRows.map { row in
+            row.enumerated().map { idx, value in
+                pad(value, to: widths[idx])
+            }.joined(separator: "  ")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
     nonisolated static func parseCSVRows(_ s: String) -> [[String]] {
         parseDelimitedRows(s, delimiter: ",")
     }

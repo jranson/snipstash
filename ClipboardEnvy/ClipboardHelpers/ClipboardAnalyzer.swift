@@ -13,6 +13,7 @@ enum ClipboardDataType: String, CaseIterable {
     case tsv = "TSV"
     case psv = "PSV"
     case yaml = "YAML"
+    case fixedWidthTable = "Table"
     case databaseCLITable = "Database CLI Table"
     case generalText = "General Text"
 }
@@ -93,6 +94,16 @@ struct ClipboardAnalysis {
         self["Format"]
     }
 
+    /// Convenience accessor for detected fixed-width / CLI-style table type (e.g., "Docker Containers List").
+    var tableTypeName: String? {
+        self["Table Type"]
+    }
+
+    /// True when analysis represents any tabular data type with columnar structure.
+    var isTableLike: Bool {
+        dataType == .fixedWidthTable || dataType == .databaseCLITable || isDelimitedData
+    }
+
     /// Convenience accessor for detected time format (e.g., "Epoch Seconds", "RFC3339 / ISO8601").
     var timeFormat: String? {
         self["Detected Format"]
@@ -170,6 +181,7 @@ enum ClipboardAnalyzer {
         if let analysis = detectBase64(trimmed, original: text) { return analysis }
         if let analysis = detectJSON(trimmed, original: text) { return analysis }
         if let analysis = detectDatabaseCLITable(trimmed, original: text) { return analysis }
+        if let analysis = detectFixedWidthTable(trimmed, original: text) { return analysis }
         if let analysis = detectCSV(trimmed, original: text) { return analysis }
         if let analysis = detectTSV(trimmed, original: text) { return analysis }
         if let analysis = detectPSV(trimmed, original: text) { return analysis }
@@ -363,6 +375,54 @@ enum ClipboardAnalyzer {
         if let analysis = detectSqlite3Table(lines, original: original) { return analysis }
 
         return nil
+    }
+
+    /// Detects fixed-width, space- or column-aligned tables without explicit borders (e.g., `ps`, `docker ps`, `kubectl get`).
+    /// Primarily uses runs of 2+ spaces as delimiters between columns, but falls back to any whitespace
+    /// when necessary (for commands that emit single-space-separated columns like short `ps` output).
+    private static func detectFixedWidthTable(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+        let unix = trimmed.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        let lines = unix.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard lines.count >= 2 else { return nil }
+
+        let headerLine = lines[0]
+        var headerColumns = splitFixedWidthLine(headerLine)
+        var useLooseWhitespaceSplit = false
+        if headerColumns.count < 3 {
+            headerColumns = splitLooseWhitespaceLine(headerLine)
+            useLooseWhitespaceSplit = headerColumns.count >= 3
+        }
+        // Require at least 3 reasonably sized header columns to be considered a table.
+        guard headerColumns.count >= 3, headerColumns.count <= 32 else { return nil }
+
+        // If this matches a known table type (e.g. Open Files List), accept it immediately
+        // without requiring strict column-count consistency across data rows. Some table
+        // formats have optional middle columns that are blank on many lines.
+        if let tableType = recognizeKnownTableType(fromHeaderColumns: headerColumns) {
+            var analysis = ClipboardAnalysis(dataType: .fixedWidthTable)
+            addTextMetrics(to: &analysis, text: original)
+            analysis.set("Columns", "\(headerColumns.count)")
+            analysis.set("Rows", "\(max(0, lines.count - 1))")
+            analysis.set("Table Type", tableType)
+            return analysis
+        }
+
+        // Ensure at least one data row roughly matches the header column count.
+        let dataLines = Array(lines.dropFirst())
+        let splitter: (String) -> [String] = useLooseWhitespaceSplit
+            ? { line in splitLooseWhitespaceLine(line) }
+            : { line in splitFixedWidthLine(line) }
+        let dataColumnMatches = dataLines.prefix(10).filter { !splitter($0).isEmpty }.map { splitter($0).count }
+        guard let firstCount = dataColumnMatches.first, !dataColumnMatches.isEmpty else { return nil }
+        let consistent = dataColumnMatches.allSatisfy { abs($0 - firstCount) <= 1 }
+        guard consistent else { return nil }
+
+        var analysis = ClipboardAnalysis(dataType: .fixedWidthTable)
+        addTextMetrics(to: &analysis, text: original)
+        analysis.set("Columns", "\(headerColumns.count)")
+        analysis.set("Rows", "\(max(0, lines.count - 1))")
+
+        return analysis
     }
 
     private static func detectMySQLTable(_ lines: [String], original: String) -> ClipboardAnalysis? {
@@ -682,5 +742,140 @@ enum ClipboardAnalyzer {
         let range = NSRange(s.startIndex..., in: s)
         let matches = sentencePattern?.numberOfMatches(in: s, options: [], range: range) ?? 0
         return matches >= 2
+    }
+
+    // MARK: - Fixed-Width Table Helpers
+
+    /// Splits a fixed-width table line into columns using runs of 2+ spaces as delimiters.
+    private static func splitFixedWidthLine(_ line: String) -> [String] {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return [] }
+
+        // Use regex on NSString API to avoid bridging overhead of NSRegularExpression on Swift substrings.
+        let nsLine = trimmed as NSString
+        let pattern = "\\s{2,}"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return trimmed.components(separatedBy: .whitespaces)
+        }
+
+        let range = NSRange(location: 0, length: nsLine.length)
+        var lastEnd = 0
+        var fields: [String] = []
+
+        regex.enumerateMatches(in: trimmed, options: [], range: range) { match, _, _ in
+            guard let match = match else { return }
+            let fieldRange = NSRange(location: lastEnd, length: match.range.location - lastEnd)
+            let field = nsLine.substring(with: fieldRange).trimmingCharacters(in: .whitespaces)
+            if !field.isEmpty {
+                fields.append(field)
+            }
+            lastEnd = match.range.location + match.range.length
+        }
+
+        if lastEnd < nsLine.length {
+            let tailRange = NSRange(location: lastEnd, length: nsLine.length - lastEnd)
+            let tail = nsLine.substring(with: tailRange).trimmingCharacters(in: .whitespaces)
+            if !tail.isEmpty {
+                fields.append(tail)
+            }
+        }
+
+        return fields
+    }
+
+    /// Splits a line into columns using any run of 1+ whitespace chars as delimiters.
+    /// Used as a fallback for tables that are space-delimited but not strictly aligned with 2+ spaces (e.g. short `ps`).
+    private static func splitLooseWhitespaceLine(_ line: String) -> [String] {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return [] }
+        return trimmed.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+    }
+
+    /// Recognizes well-known fixed-width / CLI table types based on header column names.
+    private static func recognizeKnownTableType(fromHeaderColumns headerColumns: [String]) -> String? {
+        let normalized = headerColumns.map { normalizeHeaderToken($0) }
+
+        let knownPatterns: [(name: String, requiredPrefix: [String])] = [
+            ("Docker Containers List", ["CONTAINER ID", "IMAGE", "COMMAND"]),
+            ("Docker Images List", ["IMAGE", "ID", "DISK USAGE"]),
+            // Order more specific Kubernetes patterns before general ones so they win ties.
+            ("Kubernetes Pods List", ["NAME", "READY", "STATUS", "RESTARTS", "AGE"]),
+            ("Kubernetes Nodes List", ["NAME", "STATUS", "ROLES"]),
+            ("Kubernetes General List", ["NAME", "STATUS", "AGE"]),
+            ("Kubernetes Services List", ["NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP"]),
+            ("Kubernetes Certs List", ["NAME", "READY", "SECRET", "AGE"]),
+            ("Process List", ["PID", "CMD"]),
+            ("Process List", ["PID", "COMMAND"]),
+            ("Netstat", ["PROTO", "RECV-Q", "SEND-Q", "LOCAL ADDRESS", "FOREIGN ADDRESS"]),
+            // Open Files List: allow extra columns (e.g. TID/TASKCMD) between PID and USER.
+            ("Open Files List", ["COMMAND", "PID", "USER", "FD", "TYPE", "DEVICE", "SIZE/OFF", "NODE NAME"]),
+        ]
+
+        var bestMatchName: String?
+        var bestMatchLength: Int = 0
+
+        for pattern in knownPatterns {
+            if headerColumnsMatchInOrder(columns: normalized, requiredSequence: pattern.requiredPrefix),
+               pattern.requiredPrefix.count > bestMatchLength {
+                bestMatchName = pattern.name
+                bestMatchLength = pattern.requiredPrefix.count
+            }
+        }
+
+        // If we matched a specific known pattern (e.g. Open Files List), prefer that over
+        // the more generic Process List heuristics below.
+        if let bestMatchName {
+            return bestMatchName
+        }
+
+        // Generic Process List fallback: if we see PID and either CMD or COMMAND as columns anywhere,
+        // treat this as a Process List even if there are additional leading columns like USER
+        // or when TIME/COMMAND are merged into a single "TIME COMMAND" header.
+        if normalized.contains("PID") {
+            let hasCmdLikeHeader = normalized.contains(where: { token in
+                token == "CMD" ||
+                token == "COMMAND" ||
+                token.hasSuffix(" CMD") ||
+                token.contains(" CMD ") ||
+                token.hasSuffix(" COMMAND") ||
+                token.contains(" COMMAND ")
+            })
+            if hasCmdLikeHeader {
+                return "Process List"
+            }
+        }
+
+        return nil
+    }
+
+    private static func normalizeHeaderToken(_ token: String) -> String {
+        token
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .uppercased()
+    }
+
+    /// Returns true when all required header tokens appear in order (not necessarily contiguously).
+    /// This makes detection robust to extra columns (e.g. TID/TASKCMD) inserted between known ones.
+    private static func headerColumnsMatchInOrder(columns: [String], requiredSequence: [String]) -> Bool {
+        guard !requiredSequence.isEmpty else { return false }
+        var searchStartIndex = 0
+
+        for required in requiredSequence {
+            var found = false
+            while searchStartIndex < columns.count {
+                if columns[searchStartIndex] == required {
+                    found = true
+                    searchStartIndex += 1
+                    break
+                }
+                searchStartIndex += 1
+            }
+            if !found {
+                return false
+            }
+        }
+
+        return true
     }
 }

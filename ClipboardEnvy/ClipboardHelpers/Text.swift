@@ -157,6 +157,60 @@ extension ClipboardTransform {
         return lines.joined(separator: "\n")
     }
 
+    /// Default line counts for multi-line operations (Head/Tail/Remove).
+    /// Backed by UserDefaults key "MultilineRemoveValues", falling back to sane defaults.
+    nonisolated static func multilineRemoveValues() -> [Int] {
+        let key = "MultilineRemoveValues"
+        let defaults = UserDefaults.standard
+
+        // Allow users to configure via: `defaults write <bundle-id> MultilineRemoveValues -array 1 2 5 10 25 50`
+        if let stored = defaults.array(forKey: key) {
+            let ints: [Int] = stored.compactMap {
+                if let n = $0 as? Int { return n }
+                if let s = $0 as? String, let n = Int(s) { return n }
+                return nil
+            }.filter { $0 > 0 }
+            if !ints.isEmpty {
+                return ints
+            }
+        }
+
+        // Fallback defaults shown in the README.
+        return [1, 2, 5, 10, 25, 50]
+    }
+
+    /// Returns the first `count` lines (like `head`).
+    nonisolated static func headLines(_ s: String, count: Int) -> String {
+        guard count > 0 else { return "" }
+        let lines = s.components(separatedBy: .newlines)
+        let k = min(count, lines.count)
+        return lines.prefix(k).joined(separator: "\n")
+    }
+
+    /// Returns the last `count` lines (like `tail`).
+    nonisolated static func tailLines(_ s: String, count: Int) -> String {
+        guard count > 0 else { return "" }
+        let lines = s.components(separatedBy: .newlines)
+        let k = min(count, lines.count)
+        return lines.suffix(k).joined(separator: "\n")
+    }
+
+    /// Removes the first `count` lines; safe when `count` ≥ total lines.
+    nonisolated static func removeFirstLines(_ s: String, count: Int) -> String {
+        guard count > 0 else { return s }
+        let lines = s.components(separatedBy: .newlines)
+        let k = min(count, lines.count)
+        return lines.dropFirst(k).joined(separator: "\n")
+    }
+
+    /// Removes the last `count` lines; safe when `count` ≥ total lines.
+    nonisolated static func removeLastLines(_ s: String, count: Int) -> String {
+        guard count > 0 else { return s }
+        let lines = s.components(separatedBy: .newlines)
+        let k = min(count, lines.count)
+        return lines.dropLast(k).joined(separator: "\n")
+    }
+
     nonisolated static func removeEmptyLines(_ s: String) -> String {
         s.components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }

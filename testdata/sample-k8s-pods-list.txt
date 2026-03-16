@@ -1,0 +1,4 @@
+NAME                                       READY   STATUS    RESTARTS       AGE
+cert-manager-cainjector-686546c9f7-9psrt   1/1     Running   5 (198d ago)   332d
+cert-manager-d6746cf45-2rt6n               1/1     Running   7 (193d ago)   332d
+cert-manager-webhook-5f79cd6f4b-h5vhn      1/1     Running   5 (198d ago)   332d

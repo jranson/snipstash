@@ -208,3 +208,17 @@ No doubt I now grew very pale; — but I talked more fluently, and with a height
 “Villains!” I shrieked, “dissemble no more! I admit the deed! — tear up the planks! — here, here! — it is the beating of his hideous heart!”
 """
 }
+
+extension TestData {
+    /// Sample fixed-width Docker containers table (docker ps).
+    static let fixedWidthDockerContainers = """
+CONTAINER ID   IMAGE                               COMMAND                  CREATED        STATUS          PORTS                                            NAMES
+0174770c786b   grafana/grafana:11.6.0              "/run.sh"                2 months ago   Up 17 seconds   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp   environment-grafana-1
+59b86616bd90   telegraf:1.34-alpine                "/entrypoint.sh tele…"   2 months ago   Up 17 seconds   8092/udp, 8125/udp, 8094/tcp                  environment-telegraf-1
+2636a2518a59   jaegertracing/all-in-one:1.67.0     "/go/bin/all-in-one-…"   2 months ago   Up 17 seconds   0.0.0.0:5775->5775/udp, [::]:5775->5775/udp   environment-jaeger-1
+e75b1b85fc69   redis:latest                        "docker-entrypoint.s…"   2 months ago   Up 17 seconds   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp   environment-redis-1
+f93207515c6b   prom/prometheus:v3.2.1              "/bin/prometheus --c…"   2 months ago   Up 17 seconds   0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp   environment-prometheus-1
+353c77a668f1   influxdb:2.7                        "/entrypoint.sh --re…"   2 months ago   Up 17 seconds   0.0.0.0:8086->8086/tcp, [::]:8086->8086/tcp   environment-influxdb2-1
+76203b2c3a5d   clickhouse/clickhouse-server:25.3   "/entrypoint.sh"         2 months ago   Up 17 seconds   0.0.0.0:8123->8123/tcp, [::]:8123->8123/tcp   environment-clickhouse-1
+"""
+}

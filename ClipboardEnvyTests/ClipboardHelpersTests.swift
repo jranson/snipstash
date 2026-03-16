@@ -996,6 +996,46 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(ClipboardTransform.trimLines("\t hello \t\n world"), "hello\nworld")
     }
 
+    func testHeadLines_basic() {
+        let input = "a\nb\nc\nd"
+        XCTAssertEqual(ClipboardTransform.headLines(input, count: 2), "a\nb")
+    }
+
+    func testHeadLines_moreThanAvailable() {
+        let input = "a\nb"
+        XCTAssertEqual(ClipboardTransform.headLines(input, count: 5), "a\nb")
+    }
+
+    func testTailLines_basic() {
+        let input = "a\nb\nc\nd"
+        XCTAssertEqual(ClipboardTransform.tailLines(input, count: 2), "c\nd")
+    }
+
+    func testTailLines_moreThanAvailable() {
+        let input = "a\nb"
+        XCTAssertEqual(ClipboardTransform.tailLines(input, count: 5), "a\nb")
+    }
+
+    func testRemoveFirstLines_basic() {
+        let input = "a\nb\nc\nd"
+        XCTAssertEqual(ClipboardTransform.removeFirstLines(input, count: 2), "c\nd")
+    }
+
+    func testRemoveFirstLines_moreThanAvailable_returnsEmpty() {
+        let input = "a\nb"
+        XCTAssertEqual(ClipboardTransform.removeFirstLines(input, count: 5), "")
+    }
+
+    func testRemoveLastLines_basic() {
+        let input = "a\nb\nc\nd"
+        XCTAssertEqual(ClipboardTransform.removeLastLines(input, count: 2), "a\nb")
+    }
+
+    func testRemoveLastLines_moreThanAvailable_returnsEmpty() {
+        let input = "a\nb"
+        XCTAssertEqual(ClipboardTransform.removeLastLines(input, count: 5), "")
+    }
+
     // MARK: - HTML escaping
 
     func testHtmlEscape() {
@@ -1862,5 +1902,82 @@ final class ClipboardHelpersTests: XCTestCase {
         let withPercent = "hello%21world"
         let analysis = ClipboardAnalyzer.analyze(withPercent)
         XCTAssertTrue(analysis.isPossiblyURLEncoded)
+    }
+
+    // MARK: - Fixed-Width Tables
+
+    func testAnalyzer_fixedWidthDockerContainers_detectedAsFixedWidthTableAndKnownType() throws {
+        let content = try readTestdata("sample-fixed-width-table.txt")
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .fixedWidthTable)
+        XCTAssertEqual(analysis["Columns"], "7")
+        XCTAssertEqual(analysis["Rows"], "7")
+        XCTAssertEqual(analysis.tableTypeName, "Docker Containers List")
+    }
+
+    func testAnalyzer_openFilesList_detectedAsFixedWidthTableAndKnownType() throws {
+        let content = try readTestdata("sample-open-files-list.txt")
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .fixedWidthTable)
+        XCTAssertEqual(analysis.tableTypeName, "Open Files List")
+    }
+
+    func testAnalyzer_kubernetesPodsList_detectedAsPodsList() throws {
+        let content = try readTestdata("sample-k8s-pods-list.txt")
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .fixedWidthTable)
+        XCTAssertEqual(analysis.tableTypeName, "Kubernetes Pods List")
+    }
+
+    func testAnalyzer_psProcessList_detectedAsFixedWidthProcessList() throws {
+        let content = try readTestdata("sample-ps-process-list.txt")
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .fixedWidthTable)
+        XCTAssertEqual(analysis.tableTypeName, "Process List")
+    }
+
+    func testAnalyzer_psAuxStyleProcessList_detectedAsProcessList() throws {
+        let content = """
+USER               PID  %CPU %MEM      VSZ    RSS   TT  STAT STARTED      TIME COMMAND
+joeuser          63700  48.4  9.2 448117440 12373200   ??  Rs   10:16PM  33:42.78 /System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/
+joeuser          65085   9.4  0.9 1896047824 1268672   ??  S    10:19PM  15:40.94 /Applications/Cursor.app/Contents/Frameworks/Cursor Helper (Renderer).app/Contents/MacOS/Cursor Helper (Renderer) --type=renderer --us
+"""
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .fixedWidthTable)
+        XCTAssertEqual(analysis.tableTypeName, "Process List")
+    }
+
+    func testTransform_fixedWidthDockerContainers_toCsvAndJson() throws {
+        let content = try readTestdata("sample-fixed-width-table.txt")
+        let csv = try ClipboardTransform.fixedWidthTableToCsv(content)
+        // Header should contain the three key Docker columns in order.
+        let header = csv.components(separatedBy: .newlines).first ?? ""
+        XCTAssertTrue(header.hasPrefix("CONTAINER ID,IMAGE,COMMAND"), "header should start with key Docker columns; got: \(header)")
+
+        let jsonTyped = try ClipboardTransform.fixedWidthTableToJson(content)
+        let rowsTyped = try decodeJSONArray(jsonTyped)
+        XCTAssertEqual(rowsTyped.count, 7)
+        XCTAssertNotNil(rowsTyped.first?["CONTAINER ID"])
+
+        let jsonStrings = try ClipboardTransform.fixedWidthTableToJsonStrings(content)
+        let rowsStrings = try decodeJSONArray(jsonStrings)
+        XCTAssertEqual(rowsStrings.count, 7)
+        XCTAssertEqual(rowsStrings.first?["CONTAINER ID"] as? String, "0174770c786b")
+    }
+
+    func testCsvToFixedWidthTable_roundTripWithCsvToJson() throws {
+        let content = try readTestdata("sample.csv")
+        let csv = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let table = try ClipboardTransform.csvToFixedWidthTable(csv)
+        let backToCsv = try ClipboardTransform.fixedWidthTableToCsv(table)
+
+        let jsonOriginal = try ClipboardTransform.csvToJson(csv)
+        let jsonRoundTrip = try ClipboardTransform.csvToJson(backToCsv)
+
+        let rowsOriginal = try decodeJSONArray(jsonOriginal)
+        let rowsRoundTrip = try decodeJSONArray(jsonRoundTrip)
+        XCTAssertEqual(rowsOriginal.count, rowsRoundTrip.count)
+        XCTAssertEqual(rowsOriginal.first?["id"] as? Int, rowsRoundTrip.first?["id"] as? Int)
+        XCTAssertEqual(rowsOriginal.first?["name"] as? String, rowsRoundTrip.first?["name"] as? String)
     }
 }

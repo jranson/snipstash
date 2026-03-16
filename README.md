@@ -1,8 +1,8 @@
-# <img src="assets/app-icon-transparent.png" alt="Clipboard Envy" height="48" /> Clipboard Envy [<img align="right" src="assets/download-app-store.svg" />](https://apps.apple.com/us/app/snipstash/id6759918875)
+# <img src="assets/app-icon-transparent.png" alt="Clipboard Envy" height="48" /> Clipboard Envy [<img align="right" src="assets/download-app-store.svg" />](https://apps.apple.com/us/app/clipboard-envy/id6759918875)
 
 A lightweight, developer-focused macOS Menu Bar-only app for managing and transforming Clipboard data.
 
-Clipboard Envy is [available in the App Store](https://apps.apple.com/us/app/snipstash/id6759918875) or can be downloaded directly from [this project's releases](https://github.com/centennial-oss/clipboard-envy/releases).
+Clipboard Envy is [available in the App Store](https://apps.apple.com/us/app/clipboard-envy/id6759918875) or can be downloaded directly from [this project's releases](https://github.com/centennial-oss/clipboard-envy/releases).
 
 ## About
 
@@ -63,14 +63,16 @@ Some options are controlled via macOS defaults (no settings UI). After changing 
 | `Argon2MemoryKiB` | 65535 | Memory cost in KiB for **Encode & Hash → Argon2id Hash**. |
 | `Argon2Iterations` | 3 | Time cost (iterations) for Argon2id. |
 | `Argon2Parallelism` | 1 | Parallelism (lanes) for Argon2id. |
+| `MultilineRemoveValues` | `1 2 5 10 25 50` | Line counts used for **Multi-line → Remove / Head / Tail** menu entries. |
 
 **Examples (run in Terminal):**
 
 ```bash
-defaults read org.centennialoss.snipstash                    # show current values
+defaults read org.centennialoss.snipstash                               # show current values
 defaults write org.centennialoss.snipstash Argon2MemoryKiB 65535
 defaults write org.centennialoss.snipstash Argon2Iterations 3
 defaults write org.centennialoss.snipstash Argon2Parallelism 1
+defaults write org.centennialoss.snipstash MultilineRemoveValues -array 1 2 5 10 25 50
 ```
 
 ## Building

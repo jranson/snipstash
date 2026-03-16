@@ -1,0 +1,12 @@
+PID TTY           TIME CMD
+64096 ttys000    0:00.30 -zsh
+71494 ttys000    0:00.17 ssh pi@192.168.0.5
+56464 ttys002    0:00.18 /bin/zsh -il
+64635 ttys003    0:00.13 -zsh
+65239 ttys005    0:00.28 /bin/zsh -i
+67878 ttys007    0:00.25 /bin/zsh -il
+70983 ttys008    0:00.09 -zsh
+71408 ttys008    0:00.13 ssh ec2-user@jump-prd.agrology.ag
+71511 ttys009    0:00.09 -zsh
+80978 ttys013    0:00.14 -zsh
+
