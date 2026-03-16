@@ -20,27 +20,29 @@ jobs:
 
       - name: Validate required secrets are present
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_DEVID_CERT_BASE64: ${{ secrets.APPLE_DEVID_CERT_BASE64 }}
           APPLE_DIST_APP_CERT_BASE64: ${{ secrets.APPLE_DIST_APP_CERT_BASE64 }}
           APPLE_DIST_INSTALLER_CERT_BASE64: ${{ secrets.APPLE_DIST_INSTALLER_CERT_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
           REQUIRED_VARS=(
-            APPLE_ID
             APPLE_TEAM_ID
-            APPLE_APP_SPECIFIC_PASSWORD
             APPLE_DEVID_CERT_BASE64
             APPLE_DIST_APP_CERT_BASE64
             APPLE_DIST_INSTALLER_CERT_BASE64
             APPLE_CERTIFICATE_PASSWORD
             KEYCHAIN_PASSWORD
             APPLE_SIGNING_IDENTITY
+            APP_STORE_CONNECT_KEY_ID
+            APP_STORE_CONNECT_ISSUER_ID
+            APP_STORE_CONNECT_API_KEY
           )
           for var in "${REQUIRED_VARS[@]}"; do
             if [ -z "${!var:-}" ]; then
@@ -120,22 +122,52 @@ jobs:
             exit 1
           fi
 
+      - name: Install App Store Connect API key
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode \
+            > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+
       - name: Archive for App Store preflight
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcodebuild archive \
             -scheme ClipboardEnvy \
             -configuration Release \
             -archivePath build/ClipboardEnvy-preflight.xcarchive \
             -destination 'generic/platform=macOS' \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Automatic
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
 
-      - name: Export Mac App Store package preflight
+      - name: Export Mac App Store package preflight (no upload)
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          /usr/libexec/PlistBuddy \
+            -c "Add :method string app-store-connect" \
+            -c "Add :destination string export" \
+            -c "Add :signingStyle string automatic" \
+            -c "Add :teamID string $APPLE_TEAM_ID" \
+            /tmp/ExportOptions-preflight.plist
           xcodebuild -exportArchive \
             -archivePath build/ClipboardEnvy-preflight.xcarchive \
             -exportPath build/AppStoreExport-preflight \
-            -exportOptionsPlist ExportOptions.plist
+            -exportOptionsPlist /tmp/ExportOptions-preflight.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
 
       - name: Verify exported package exists and is signed
         run: |
@@ -150,4 +182,3 @@ jobs:
           PKG_PATH="${PKGS[0]}"
           echo "Preflight package: $PKG_PATH"
           pkgutil --check-signature "$PKG_PATH"
-

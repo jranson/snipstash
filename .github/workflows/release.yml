@@ -28,27 +28,29 @@ jobs:
 
       - name: Validate required secrets are present
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_DEVID_CERT_BASE64: ${{ secrets.APPLE_DEVID_CERT_BASE64 }}
           APPLE_DIST_APP_CERT_BASE64: ${{ secrets.APPLE_DIST_APP_CERT_BASE64 }}
           APPLE_DIST_INSTALLER_CERT_BASE64: ${{ secrets.APPLE_DIST_INSTALLER_CERT_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
           REQUIRED_VARS=(
-            APPLE_ID
             APPLE_TEAM_ID
-            APPLE_APP_SPECIFIC_PASSWORD
             APPLE_DEVID_CERT_BASE64
             APPLE_DIST_APP_CERT_BASE64
             APPLE_DIST_INSTALLER_CERT_BASE64
             APPLE_CERTIFICATE_PASSWORD
             KEYCHAIN_PASSWORD
             APPLE_SIGNING_IDENTITY
+            APP_STORE_CONNECT_KEY_ID
+            APP_STORE_CONNECT_ISSUER_ID
+            APP_STORE_CONNECT_API_KEY
           )
           for var in "${REQUIRED_VARS[@]}"; do
             if [ -z "${!var:-}" ]; then
@@ -78,7 +80,7 @@ jobs:
           ARCH="arm64" \
           make generate-build-info
 
-      - name: Build Clipboard Envy (macOS Apple Silicon)
+      - name: Build Clipboard Envy for direct distribution (GitHub release)
         run: |
           xcodebuild -scheme ClipboardEnvy \
             -configuration Release \
@@ -140,7 +142,16 @@ jobs:
             exit 1
           fi
 
-      - name: Code sign app
+      - name: Install App Store Connect API key
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode \
+            > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+
+      - name: Code sign app (Developer ID - for GitHub release)
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
@@ -156,16 +167,15 @@ jobs:
             "$APP_PATH"
           codesign --verify --verbose "$APP_PATH"
 
-      - name: Notarize app
+      - name: Notarize app (GitHub release)
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcrun notarytool store-credentials "notarytool-profile" \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+            --key ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
+            --key-id "$APP_STORE_CONNECT_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID"
           cd build/Build/Products/Release
           ditto -c -k --keepParent "Clipboard Envy.app" notarization.zip
           SUBMIT_OUTPUT=$(xcrun notarytool submit notarization.zip --keychain-profile "notarytool-profile" --wait 2>&1)
@@ -189,41 +199,42 @@ jobs:
           mv "ClipboardEnvy-${VERSION}-macOS-universal.zip" "$GITHUB_WORKSPACE/"
 
       - name: Archive for Mac App Store
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcodebuild archive \
             -scheme ClipboardEnvy \
             -configuration Release \
             -archivePath build/ClipboardEnvy.xcarchive \
             -destination 'generic/platform=macOS' \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Automatic
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
 
-      - name: Export Mac App Store package
+      - name: Export and upload to App Store Connect
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          /usr/libexec/PlistBuddy \
+            -c "Add :method string app-store-connect" \
+            -c "Add :destination string upload" \
+            -c "Add :signingStyle string automatic" \
+            -c "Add :teamID string $APPLE_TEAM_ID" \
+            /tmp/ExportOptions-CI.plist
           xcodebuild -exportArchive \
             -archivePath build/ClipboardEnvy.xcarchive \
             -exportPath build/AppStoreExport \
-            -exportOptionsPlist ExportOptions.plist
-
-      - name: Upload to App Store Connect
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          shopt -s nullglob
-          PKGS=(build/AppStoreExport/*.pkg)
-          if [ ${#PKGS[@]} -eq 0 ]; then
-            echo "::error::No .pkg found in build/AppStoreExport after export step."
-            ls -la build/AppStoreExport || true
-            exit 1
-          fi
-          PKG_PATH="${PKGS[0]}"
-          echo "Uploading package: $PKG_PATH"
-          xcrun altool --upload-app \
-            -f "$PKG_PATH" \
-            -t osx \
-            -u "$APPLE_ID" \
-            -p "$APPLE_APP_SPECIFIC_PASSWORD"
+            -exportOptionsPlist /tmp/ExportOptions-CI.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
