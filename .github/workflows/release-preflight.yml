@@ -113,12 +113,13 @@ jobs:
             echo "::error::No Developer ID Application identity found in imported certificates."
             exit 1
           fi
-          if ! grep -E "Apple Distribution|Distribution Managed|3rd Party Mac Developer Application" codesign-identities.txt > /dev/null; then
-            echo "::error::No Apple Distribution/3rd Party Mac Developer Application identity found in imported certificates."
+          # Cert names are always prefixed with these strings (e.g. "3rd Party Mac Developer Application: Name (TEAM)")
+          if ! grep -F "3rd Party Mac Developer Application" codesign-identities.txt > /dev/null; then
+            echo "::error::No 3rd Party Mac Developer Application identity found in imported certificates."
             exit 1
           fi
-          if ! grep -E "Mac Installer Distribution|3rd Party Mac Developer Installer" all-identities.txt > /dev/null; then
-            echo "::error::No Mac Installer Distribution/3rd Party Mac Developer Installer identity found in imported certificates."
+          if ! grep -F "3rd Party Mac Developer Installer" all-identities.txt > /dev/null; then
+            echo "::error::No 3rd Party Mac Developer Installer identity found in imported certificates."
             exit 1
           fi
 
@@ -137,6 +138,8 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          # Override project's "Apple Development" with distribution cert to avoid "Mac Development" error in CI.
+          # Prefix matches cert names like "3rd Party Mac Developer Application: Name (TEAM)"
           xcodebuild archive \
             -scheme ClipboardEnvy \
             -configuration Release \
@@ -146,7 +149,9 @@ jobs:
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="3rd Party Mac Developer Application"
 
       - name: Export Mac App Store package preflight (no upload)
         env:
@@ -154,7 +159,7 @@ jobs:
         run: |
           # signingStyle=manual: sign locally with the certs imported into the keychain,
           # not via cloud signing (which requires elevated API key permissions).
-          # The provisioning profile is already embedded in the archive from the previous step.
+          # Prefix matches cert names like "3rd Party Mac Developer Application: Name (TEAM)"
           /usr/libexec/PlistBuddy \
             -c "Add :method string app-store-connect" \
             -c "Add :destination string export" \
