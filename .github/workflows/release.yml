@@ -221,17 +221,23 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          # signingStyle=manual: sign locally with the certs imported into the keychain,
+          # not via cloud signing (which requires elevated API key permissions).
+          # The provisioning profile is already embedded in the archive from the previous step.
           /usr/libexec/PlistBuddy \
             -c "Add :method string app-store-connect" \
             -c "Add :destination string upload" \
-            -c "Add :signingStyle string automatic" \
+            -c "Add :signingStyle string manual" \
+            -c "Add :signingCertificate string 3rd Party Mac Developer Application" \
+            -c "Add :installerSigningCertificate string 3rd Party Mac Developer Installer" \
             -c "Add :teamID string $APPLE_TEAM_ID" \
             /tmp/ExportOptions-CI.plist
+          # -allowProvisioningUpdates not needed here: the archive already has the profile embedded.
+          # The API key flags authenticate the upload-to-App-Store-Connect portion only.
           xcodebuild -exportArchive \
             -archivePath build/ClipboardEnvy.xcarchive \
             -exportPath build/AppStoreExport \
             -exportOptionsPlist /tmp/ExportOptions-CI.plist \
-            -allowProvisioningUpdates \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8

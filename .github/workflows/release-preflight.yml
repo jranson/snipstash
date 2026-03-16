@@ -151,23 +151,23 @@ jobs:
       - name: Export Mac App Store package preflight (no upload)
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          # signingStyle=manual: sign locally with the certs imported into the keychain,
+          # not via cloud signing (which requires elevated API key permissions).
+          # The provisioning profile is already embedded in the archive from the previous step.
           /usr/libexec/PlistBuddy \
             -c "Add :method string app-store-connect" \
             -c "Add :destination string export" \
-            -c "Add :signingStyle string automatic" \
+            -c "Add :signingStyle string manual" \
+            -c "Add :signingCertificate string 3rd Party Mac Developer Application" \
+            -c "Add :installerSigningCertificate string 3rd Party Mac Developer Installer" \
             -c "Add :teamID string $APPLE_TEAM_ID" \
             /tmp/ExportOptions-preflight.plist
+          # -allowProvisioningUpdates not needed: the archive already has the profile embedded.
           xcodebuild -exportArchive \
             -archivePath build/ClipboardEnvy-preflight.xcarchive \
             -exportPath build/AppStoreExport-preflight \
-            -exportOptionsPlist /tmp/ExportOptions-preflight.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+            -exportOptionsPlist /tmp/ExportOptions-preflight.plist
 
       - name: Verify exported package exists and is signed
         run: |
