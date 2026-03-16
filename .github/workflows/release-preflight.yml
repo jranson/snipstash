@@ -1,20 +1,12 @@
-name: Release
+name: Release Preflight
 
 on:
-  push:
-    tags:
-      # Semantic version tags: v1.0.0, v2.1.3, etc.
-      - 'v*.*.*'
-      # Also support tags without 'v' prefix: 1.0.0, 2.1.3, etc.
-      - '*.*.*'
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
-  build-and-release:
-    if: github.repository_owner == 'centennial-oss'
-    runs-on: macos-14  # Minimum supported macOS; Apple Silicon runner
+  preflight:
+    if: github.repository_owner == 'centennial-oss' && github.ref_name == 'main'
+    runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,13 +49,10 @@ jobs:
             fi
           done
 
-      - name: Set version from tag
-        id: version
+      - name: Set synthetic version/build for preflight
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
+          VERSION="0.0.0-preflight"
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
-          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           {
             printf 'MARKETING_VERSION = %s\n' "$VERSION"
             printf 'CURRENT_PROJECT_VERSION = %s\n' "$BUILD_NUMBER"
@@ -77,15 +66,6 @@ jobs:
           CONFIG="Release" \
           ARCH="arm64" \
           make generate-build-info
-
-      - name: Build Clipboard Envy (macOS Apple Silicon)
-        run: |
-          xcodebuild -scheme ClipboardEnvy \
-            -configuration Release \
-            -derivedDataPath build \
-            -destination 'platform=macOS,arch=arm64' \
-            CODE_SIGN_IDENTITY="-" \
-            clean build
 
       - name: Import signing certificates
         env:
@@ -133,97 +113,35 @@ jobs:
             exit 1
           fi
 
-      - name: Code sign app
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          APP_PATH="build/Build/Products/Release/Clipboard Envy.app"
-          XCENT="build/Build/Intermediates.noindex/ClipboardEnvy.build/Release/ClipboardEnvy.build/Clipboard Envy.app.xcent"
-          ENTITLEMENTS="build/Release.entitlements"
-          cp "$XCENT" "$ENTITLEMENTS"
-          # get-task-allow is for debugging only; must be false for notarization
-          /usr/libexec/PlistBuddy -c "Set :com.apple.security.get-task-allow false" "$ENTITLEMENTS"
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" \
-            --options runtime \
-            --entitlements "$ENTITLEMENTS" \
-            "$APP_PATH"
-          codesign --verify --verbose "$APP_PATH"
-
-      - name: Notarize app
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          xcrun notarytool store-credentials "notarytool-profile" \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD"
-          cd build/Build/Products/Release
-          ditto -c -k --keepParent "Clipboard Envy.app" notarization.zip
-          SUBMIT_OUTPUT=$(xcrun notarytool submit notarization.zip --keychain-profile "notarytool-profile" --wait 2>&1)
-          echo "$SUBMIT_OUTPUT"
-          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-          if echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
-            echo "::error::Notarization was rejected (Invalid). Submission ID: $SUBMISSION_ID"
-            echo "--- Notarization log ---"
-            xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "notarytool-profile" || true
-            echo "--- End log ---"
-            exit 1
-          fi
-          xcrun stapler staple "Clipboard Envy.app"
-          rm notarization.zip
-
-      - name: Prepare release asset
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          cd build/Build/Products/Release
-          zip -r "ClipboardEnvy-${VERSION}-macOS-universal.zip" "Clipboard Envy.app"
-          mv "ClipboardEnvy-${VERSION}-macOS-universal.zip" "$GITHUB_WORKSPACE/"
-
-      - name: Archive for Mac App Store
+      - name: Archive for App Store preflight
         run: |
           xcodebuild archive \
             -scheme ClipboardEnvy \
             -configuration Release \
-            -archivePath build/ClipboardEnvy.xcarchive \
+            -archivePath build/ClipboardEnvy-preflight.xcarchive \
             -destination 'generic/platform=macOS' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Export Mac App Store package
+      - name: Export Mac App Store package preflight
         run: |
           xcodebuild -exportArchive \
-            -archivePath build/ClipboardEnvy.xcarchive \
-            -exportPath build/AppStoreExport \
+            -archivePath build/ClipboardEnvy-preflight.xcarchive \
+            -exportPath build/AppStoreExport-preflight \
             -exportOptionsPlist ExportOptions.plist
 
-      - name: Upload to App Store Connect
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      - name: Verify exported package exists and is signed
         run: |
+          set -euo pipefail
           shopt -s nullglob
-          PKGS=(build/AppStoreExport/*.pkg)
+          PKGS=(build/AppStoreExport-preflight/*.pkg)
           if [ ${#PKGS[@]} -eq 0 ]; then
-            echo "::error::No .pkg found in build/AppStoreExport after export step."
-            ls -la build/AppStoreExport || true
+            echo "::error::No .pkg found in build/AppStoreExport-preflight after export step."
+            ls -la build/AppStoreExport-preflight || true
             exit 1
           fi
           PKG_PATH="${PKGS[0]}"
-          echo "Uploading package: $PKG_PATH"
-          xcrun altool --upload-app \
-            -f "$PKG_PATH" \
-            -t osx \
-            -u "$APPLE_ID" \
-            -p "$APPLE_APP_SPECIFIC_PASSWORD"
+          echo "Preflight package: $PKG_PATH"
+          pkgutil --check-signature "$PKG_PATH"
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ClipboardEnvy-*-macOS-universal.zip
-          generate_release_notes: true
-          draft: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
