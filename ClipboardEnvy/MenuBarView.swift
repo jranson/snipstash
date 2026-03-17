@@ -470,44 +470,41 @@ struct MenuBarView: View {
                     Button("Reverse Lines") { transformClipboard(ClipboardTransform.reverseLines) }
                     Button("Shuffle Lines") { transformClipboard(ClipboardTransform.shuffleLines) }
                     Divider()
-                    Menu("Remove") {
+                    Menu("Remove Lines") {
                         let counts = ClipboardTransform.multilineRemoveValues()
-                        Section("First") {
-                            ForEach(counts, id: \.self) { n in
-                                let label = n == 1 ? "First Line" : "First \(n) Lines"
-                                Button(label) {
-                                    transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
-                                }
+                        ForEach(counts, id: \.self) { n in
+                            let label = "First \(n)"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
                             }
                         }
                         Divider()
-                        Section("Last") {
-                            ForEach(counts, id: \.self) { n in
-                                let label = n == 1 ? "Last Line" : "Last \(n) Lines"
-                                Button(label) {
-                                    transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
-                                }
+                        ForEach(counts, id: \.self) { n in
+                            let label = "Last \(n)"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
                             }
                         }
                     }
-                    Menu("Head") {
+                    Menu("Head Lines") {
                         let counts = ClipboardTransform.multilineRemoveValues()
                         ForEach(counts, id: \.self) { n in
-                            let label = n == 1 ? "1 Line" : "\(n) Lines"
+                            let label = "\(n)"
                             Button(label) {
                                 transformClipboard { ClipboardTransform.headLines($0, count: n) }
                             }
                         }
                     }
-                    Menu("Tail") {
+                    Menu("Tail Lines") {
                         let counts = ClipboardTransform.multilineRemoveValues()
                         ForEach(counts, id: \.self) { n in
-                            let label = n == 1 ? "1 Line" : "\(n) Lines"
+                            let label = "\(n)"
                             Button(label) {
                                 transformClipboard { ClipboardTransform.tailLines($0, count: n) }
                             }
                         }
                     }
+                    Divider()
                     Button("Indent Lines") { transformClipboard(ClipboardTransform.indentLines) }
                     Button("Un-indent Lines") { transformClipboard(ClipboardTransform.unindentLines) }
                     Button("Trim Lines") { transformClipboard(ClipboardTransform.trimLines) }
