@@ -227,7 +227,6 @@ jobs:
           DMG_NAME="${{ env.APP_NAME }}"
           DMG_FILE="${{ env.SCHEME_NAME }}-${VERSION}-macOS-universal.dmg"
           hdiutil create -volname "$DMG_NAME" -srcfolder build/Build/Products/Release -ov -format UDZO "$DMG_FILE"
-          mv "$DMG_FILE" "$GITHUB_WORKSPACE/"
 
       - name: Archive for Mac App Store
         env:
