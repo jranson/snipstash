@@ -187,6 +187,8 @@ jobs:
             -c "Add :signingStyle string manual" \
             -c "Add :signingCertificate string 3rd Party Mac Developer Application" \
             -c "Add :installerSigningCertificate string 3rd Party Mac Developer Installer" \
+            -c "Add :provisioningProfiles dict" \
+            -c "Add :provisioningProfiles:org.centennialoss.snipstash string $MAC_APP_STORE_PROFILE_UUID" \
             -c "Add :teamID string $APPLE_TEAM_ID" \
             /tmp/ExportOptions-preflight.plist
           # -allowProvisioningUpdates not needed: the archive already has the profile embedded.
