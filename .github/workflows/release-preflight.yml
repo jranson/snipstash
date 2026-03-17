@@ -167,6 +167,7 @@ jobs:
             -configuration Release \
             -archivePath ${{ env.ARCHIVE_PATH }} \
             -destination 'generic/platform=macOS' \
+            ARCHS="arm64 x86_64" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="3rd Party Mac Developer Application"
