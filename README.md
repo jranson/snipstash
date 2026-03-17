@@ -63,7 +63,12 @@ Some options are controlled via macOS defaults (no settings UI). After changing 
 | `Argon2MemoryKiB` | 65535 | Memory cost in KiB for **Encode & Hash → Argon2id Hash**. |
 | `Argon2Iterations` | 3 | Time cost (iterations) for Argon2id. |
 | `Argon2Parallelism` | 1 | Parallelism (lanes) for Argon2id. |
-| `MultilineRemoveValues` | `1 2 5 10 25 50` | Line counts used for **Multi-line → Remove / Head / Tail** menu entries. |
+| `RemoveLinesValues` | `1 2 5 10 25 50` | Line counts used for **Multi-line → Remove / Head / Tail** menu entries. |
+| `SplitJoinDelimiters` | *(none)* | Dictionary of label → delimiter used for **Multi-line → Join / Split** custom menu items. |
+| `TextRemoves` | *(none)* | Dictionary of label → substring to remove used for **Remove** custom menu items. |
+| `TextSwaps` | *(none)* | Dictionary of label → `"from->to"` specification used for **Swap** custom menu items. |
+| `TextLineWrappers` | *(none)* | Dictionary of label → `prefix|suffix` used for **Multi-line → Wrap / Unwrap Lines** custom menu items. |
+| `AwkPrintPatterns` | *(none)* | Dictionary of label → awk-like print commands used for **Multi-line → Awk** custom menu items. |
 
 **Examples (run in Terminal):**
 
@@ -72,7 +77,30 @@ defaults read org.centennialoss.snipstash                               # show c
 defaults write org.centennialoss.snipstash Argon2MemoryKiB 65535
 defaults write org.centennialoss.snipstash Argon2Iterations 3
 defaults write org.centennialoss.snipstash Argon2Parallelism 1
-defaults write org.centennialoss.snipstash MultilineRemoveValues -array 1 2 5 10 25 50
+defaults write org.centennialoss.snipstash RemoveLinesValues -array 1 2 5 10 25 50
+# Custom split/join delimiters (menu label → delimiter)
+defaults write org.centennialoss.snipstash SplitJoinDelimiters -dict \
+  "Dashes" "-" \
+  "AND" " & "
+# Custom Remove menu entries (menu label → substring)
+defaults write org.centennialoss.snipstash TextRemoves -dict \
+  "RemoveTabs" "\t"
+# Custom Swap menu entries (menu label → \"from->to\")
+defaults write org.centennialoss.snipstash TextSwaps -dict \
+  "DotsToCommas" ". -> ,"
+# Custom Wrap/Unwrap entries (menu label → prefix|suffix)
+defaults write org.centennialoss.snipstash TextLineWrappers -dict \
+  "AngleBrackets" "<|>" \
+  "Curlies" "{|}"
+# Custom Awk print patterns (menu label → awk command)
+# Supports a tiny subset of awk:
+# - Optional -d 'X' or -d "X" to set the delimiter
+# - A single {print ...} block
+# - $N field references (1-based) and string literals in quotes
+# Spaces outside quotes are ignored (concatenation), like: {print $1$2$3}
+defaults write org.centennialoss.snipstash AwkPrintPatterns -dict \
+  "PrintFirstAndThirdColumns" "{print $1\" \"$3}" \
+  "PrintSlashDelimitedCols" "-d '/' {print $4\" \"$5\" \"$6}"
 ```
 
 ## Building

@@ -85,6 +85,30 @@ extension ClipboardTransform {
         return keys.sorted().joined(separator: "\n")
     }
 
+    /// Returns true when the given string is a JSON array whose elements are all
+    /// simple literals (strings / numbers / booleans / null), with no objects or
+    /// nested arrays. Used by the menu UI to decide when to hide JSON→CSV hints
+    /// for arrays like ["Commas", "Spaces", "Tabs"] unless Option is held.
+    nonisolated static func isSimpleLiteralJsonArray(_ s: String) -> Bool {
+        let trimmed = sanitizeCommentedJSONInput(s).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data),
+              let array = json as? [Any] else {
+            return false
+        }
+
+        return array.allSatisfy { element in
+            switch element {
+            case is String, is NSNumber, is NSNull:
+                return true
+            case is [Any], is [String: Any]:
+                return false
+            default:
+                return false
+            }
+        }
+    }
+
     private nonisolated static func stripJSONNulls(from value: Any) -> Any {
         if value is NSNull {
             return NSNull()

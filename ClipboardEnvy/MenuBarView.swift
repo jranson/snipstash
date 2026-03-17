@@ -55,11 +55,24 @@ struct MenuBarView: View {
         clipboardAnalysis.dataType == .json && clipboardAnalysis.isArrayStructure
     }
 
+    /// True when the JSON array is a simple list of literals (strings / numbers / booleans / null),
+    /// e.g. ["Commas", "Spaces", "Tabs"]. Backed by JSON helpers rather than the view.
+    private var isSimpleLiteralJsonArray: Bool {
+        guard clipboardAnalysis.dataType == .json,
+              clipboardAnalysis.isArrayStructure,
+              let text = ClipboardIO.readString() else {
+            return false
+        }
+        return ClipboardTransform.isSimpleLiteralJsonArray(text)
+    }
+
     private var showQuickAction: Bool {
         [.jwt, .base64, .base64URL].contains(clipboardAnalysis.dataType)
             || isUrlWithParams
             || hasCarriageReturns
-            || isJsonArray
+            // Only treat JSON arrays as a quick action source when they are
+            // not simple literal lists; those should be hidden unless Option is held.
+            || (isJsonArray && !isSimpleLiteralJsonArray)
     }
 
     private var isPossiblyURLEncoded: Bool {
@@ -77,9 +90,9 @@ struct MenuBarView: View {
                               clipboardAnalysis.dataType == .base64 ||
                               clipboardAnalysis.dataType == .base64URL ||
                               isPossiblyURLEncoded) {
-            return "Encode & Hash ✨"
+            return "Encode / Hash ✨"
         }
-        return "Encode & Hash"
+        return "Encode / Hash"
     }
 
     // MARK: - URLs Menu
@@ -140,7 +153,16 @@ struct MenuBarView: View {
     }
 
     private var showJSONArrayToCsv: Bool {
-        shouldShowAll || clipboardAnalysis.isArrayStructure
+        // When showing all items (Option held), always offer Array → CSV for arrays.
+        if shouldShowAll {
+            return clipboardAnalysis.isArrayStructure
+        }
+        // For normal mode, hide CSV transforms for simple literal arrays like
+        // ["Commas", "Spaces", ...].
+        if isSimpleLiteralJsonArray {
+            return false
+        }
+        return clipboardAnalysis.isArrayStructure
     }
 
     private var jsonYAMLMenuLabel: String {
@@ -197,6 +219,13 @@ struct MenuBarView: View {
 
     private var showMultilineMenu: Bool {
         shouldShowAll || clipboardAnalysis.lineCount > 1
+    }
+
+    private var generalTextMenuLabel: String {
+        if !shouldShowAll && isSimpleLiteralJsonArray {
+            return "General Text ✨"
+        }
+        return "General Text"
     }
 
     // MARK: - Column Menu Properties
@@ -312,26 +341,163 @@ struct MenuBarView: View {
             if hasCarriageReturns {
                 Button("CRLF → LF (strip \\r) ✨") { transformClipboard(ClipboardTransform.windowsNewlinesToUnix) }
             }
-            if isJsonArray {
+            if isJsonArray && (!isSimpleLiteralJsonArray || shouldShowAll) {
                 Button("JSON Array → CSV ✨") { transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv) }
+            }
+            if isSimpleLiteralJsonArray {
+                Button("Split JSON Array ✨") {
+                    transformClipboardIfValid { input in
+                        ClipboardTransform.simpleLiteralJsonArrayToLines(input) ?? input
+                    }
+                }
             }
         }
         if clipboardAnalysis.dataType != .nonText {
             Menu("Transform Clipboard Data") {
-            Menu("General Text") {
+            Menu(generalTextMenuLabel) {
                 Button("UPPERCASE") { transformClipboard(ClipboardTransform.uppercase) }
                 Button("lowercase") { transformClipboard(ClipboardTransform.lowercase) }
                 Button("Trimmed") { transformClipboard(ClipboardTransform.trimmed) }
-                Button("Trimmed lowercase") { transformClipboard(ClipboardTransform.lowercaseTrimmed) }
+                Button("trim+lowercase") { transformClipboard(ClipboardTransform.lowercaseTrimmed) }
                 Divider()
                 Button("Title Case") { transformClipboard(ClipboardTransform.titleCase) }
                 Button("Sentence case") { transformClipboard(ClipboardTransform.sentenceCase) }
                 Divider()
                 Button("camelCase") { transformClipboard(ClipboardTransform.camelCase) }
                 Button("PascalCase") { transformClipboard(ClipboardTransform.pascalCase) }
-                Button("kebab-case (slug)") { transformClipboard(ClipboardTransform.slugify) }
+                Button("kebab-slug-case") { transformClipboard(ClipboardTransform.slugify) }
                 Button("snake_case") { transformClipboard(ClipboardTransform.snakeCase) }
                 Button("CONST_CASE") { transformClipboard(ClipboardTransform.constCase) }
+                if isSimpleLiteralJsonArray {
+                    Divider()
+                    Button("Split JSON Array ✨") {
+                        transformClipboardIfValid { input in
+                            ClipboardTransform.simpleLiteralJsonArrayToLines(input) ?? input
+                        }
+                    }
+                }
+                Divider()
+                Menu("Remove") {
+                    Button("Single Quotes") {
+                        transformClipboard { ClipboardTransform.removeSubstring($0, target: "'") }
+                    }
+                    Button("Double Quotes") {
+                        transformClipboard { ClipboardTransform.removeSubstring($0, target: "\"") }
+                    }
+                    Button("Commas") {
+                        transformClipboard { ClipboardTransform.removeSubstring($0, target: ",") }
+                    }
+                    Button("Spaces") {
+                        transformClipboard { ClipboardTransform.removeSubstring($0, target: " ") }
+                    }
+                    Button("Zero-width Characters") {
+                        transformClipboard(ClipboardTransform.removeZeroWidthCharacters)
+                    }
+                    let customRemoves = ClipboardTransform.customMultilineRemoves()
+                    if !customRemoves.isEmpty {
+                        Divider()
+                        ForEach(customRemoves, id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.removeSubstring($0, target: item.target)
+                                }
+                            }
+                        }
+                    }
+                }
+                Menu("Replace") {
+                    Button("Single → Double Quotes") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "'", to: "\"")
+                        }
+                    }
+                    Button("Double → Single Quotes") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "\"", to: "'")
+                        }
+                    }
+                    Button("Fancy → Straight Quotes") {
+                        transformClipboard(ClipboardTransform.fancyQuotesToStraight)
+                    }
+                    Button("2 Spaces → Tab") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "  ", to: "\t")
+                        }
+                    }
+                    Button("4 Spaces → Tab") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "    ", to: "\t")
+                        }
+                    }
+                    Button("Tab → 2 Spaces") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "\t", to: "  ")
+                        }
+                    }
+                    Button("Tab → 4 Spaces") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "\t", to: "    ")
+                        }
+                    }
+                    Button("CommaSpace → Comma") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: ", ", to: ",")
+                        }
+                    }
+                    Button("Comma → CommaSpace") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: ",", to: ", ")
+                        }
+                    }
+                    Button("Backslash → Slash") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "\\", to: "/")
+                        }
+                    }
+                    Button("Slash → Backslash") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "/", to: "\\")
+                        }
+                    }
+                    Button("//  →  #") {
+                        transformClipboard {
+                            ClipboardTransform.swapSubstrings($0, from: "//", to: "#")
+                        }
+                    }
+                    let customSwaps = ClipboardTransform.customMultilineSwaps()
+                    if !customSwaps.isEmpty {
+                        Divider()
+                        ForEach(customSwaps, id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.swapSubstrings($0, from: item.from, to: item.to)
+                                }
+                            }
+                        }
+                    }
+                }
+                Menu("Split to Lines") {
+                    Section("Split On") {
+                        ForEach(ClipboardTransform.builtinMultilineJoiners(), id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.splitLines(on: item.delimiter, $0)
+                                }
+                            }
+                        }
+                        let custom = ClipboardTransform.customMultilineJoiners()
+                        if !custom.isEmpty {
+                            Divider()
+                            ForEach(custom, id: \.label) { item in
+                                Button(item.label) {
+                                    transformClipboard {
+                                        ClipboardTransform.splitLines(on: item.delimiter, $0)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             if showTimeMenu {
                 Menu(timeMenuLabel) {
@@ -461,15 +627,24 @@ struct MenuBarView: View {
                     Button("bcrypt") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
                 }
             }
-            if showMultilineMenu {
-                Menu("Multi-line") {
-                    Button("Sort Lines") { transformClipboard(ClipboardTransform.sortLines) }
-                    Button("Deduplicate Lines") { transformClipboard(ClipboardTransform.deduplicateLines) }
-                    Button("Sort + Dedupe Lines") { transformClipboard(ClipboardTransform.sortAndDeduplicateLines) }
-                    Button("Remove Empty Lines") { transformClipboard(ClipboardTransform.removeEmptyLines) }
-                    Button("Reverse Lines") { transformClipboard(ClipboardTransform.reverseLines) }
-                    Button("Shuffle Lines") { transformClipboard(ClipboardTransform.shuffleLines) }
+            Menu("Multi-line") {
+                if clipboardAnalysis.lineCount > 1 || shouldShowAll {
+                    Menu("Sort Lines") {
+                        Button("Reverse Order") { transformClipboard(ClipboardTransform.reverseLines) }
+                        Button("Alphabetically") { transformClipboard(ClipboardTransform.sortLines) }
+                        Button("By Frequency ↑") { transformClipboard(ClipboardTransform.sortLinesByFrequencyAscending) }
+                        Button("By Frequency ↓") { transformClipboard(ClipboardTransform.sortLinesByFrequencyDescending) }
+                        Button("Shuffle") { transformClipboard(ClipboardTransform.shuffleLines) }
+                    }
                     Divider()
+                    Menu("Collapse Lines") {
+                        Button("Deduplicate") { transformClipboard(ClipboardTransform.deduplicateLines) }
+                        Button("Dedupe + Alpha Sort") { transformClipboard(ClipboardTransform.sortAndDeduplicateLines) }
+                        Button("Drop Empty") { transformClipboard(ClipboardTransform.removeEmptyLines) }
+                        Button("Drop Unique") { transformClipboard(ClipboardTransform.removeUniqueLines) }
+                        Button("Drop Unique + Dedupe") { transformClipboard(ClipboardTransform.keepDuplicateLinesCollapsed) }
+                        Button("Drop Non-unique") { transformClipboard(ClipboardTransform.keepUniqueLines) }
+                    }
                     Menu("Remove Lines") {
                         let counts = ClipboardTransform.multilineRemoveValues()
                         ForEach(counts, id: \.self) { n in
@@ -486,6 +661,7 @@ struct MenuBarView: View {
                             }
                         }
                     }
+
                     Menu("Head Lines") {
                         let counts = ClipboardTransform.multilineRemoveValues()
                         ForEach(counts, id: \.self) { n in
@@ -495,6 +671,7 @@ struct MenuBarView: View {
                             }
                         }
                     }
+
                     Menu("Tail Lines") {
                         let counts = ClipboardTransform.multilineRemoveValues()
                         ForEach(counts, id: \.self) { n in
@@ -505,14 +682,148 @@ struct MenuBarView: View {
                         }
                     }
                     Divider()
-                    Button("Indent Lines") { transformClipboard(ClipboardTransform.indentLines) }
-                    Button("Un-indent Lines") { transformClipboard(ClipboardTransform.unindentLines) }
-                    Button("Trim Lines") { transformClipboard(ClipboardTransform.trimLines) }
-                    if hasCarriageReturns || shouldShowAll {
-                        Divider()
-                        Button(hasCarriageReturns && !shouldShowAll ? "CRLF → LF (strip \\r) ✨" : "CRLF → LF (strip \\r)") {
-                            transformClipboard(ClipboardTransform.windowsNewlinesToUnix)
+                }
+
+                Menu("Indent Lines") {
+                    Section("Indent") {
+                        Button("1 Tab") {
+                            transformClipboard { input in
+                                ClipboardTransform.indentLines(input, indent: "\t")
+                            }
                         }
+                        Button("2 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.indentLines(input, indent: "  ")
+                            }
+                        }
+                        Button("4 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.indentLines(input, indent: "    ")
+                            }
+                        }
+                    }
+                    Section("Un-indent") {
+                        Button("1 Tab") {
+                            transformClipboard { input in
+                                ClipboardTransform.unindentLines(input, indent: "\t")
+                            }
+                        }
+                        Button("2 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.unindentLines(input, indent: "  ")
+                            }
+                        }
+                        Button("4 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.unindentLines(input, indent: "    ")
+                            }
+                        }
+                    }
+                }
+
+                Menu("Wrap Lines") {
+                    ForEach(ClipboardTransform.builtinMultilineWrappers(), id: \.label) { item in
+                        Button(item.label) {
+                            transformClipboard {
+                                ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                            }
+                        }
+                    }
+                    let custom = ClipboardTransform.customMultilineWrappers()
+                    if !custom.isEmpty {
+                        Divider()
+                        ForEach(custom, id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Menu("Unwrap Lines") {
+                    ForEach(ClipboardTransform.builtinMultilineWrappers(), id: \.label) { item in
+                        Button(item.label) {
+                            transformClipboard {
+                                ClipboardTransform.unwrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                            }
+                        }
+                    }
+                    let customUnwrap = ClipboardTransform.customMultilineWrappers()
+                    if !customUnwrap.isEmpty {
+                        Divider()
+                        ForEach(customUnwrap, id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.unwrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                                }
+                            }
+                        }
+                    }
+                }
+                Menu("Trim Lines") {
+                    Button("Whitespace") { transformClipboard(ClipboardTransform.trimLines) }
+                    Button("Trailing Commas") { transformClipboard(ClipboardTransform.trimTrailingCommas) }
+                    Button("Trailing Semicolons") { transformClipboard(ClipboardTransform.trimTrailingSemicolons) }
+                }
+                Divider()
+                if clipboardAnalysis.lineCount > 1 || shouldShowAll {
+                    Menu("Join Lines") {
+                        Section("Join With") {
+                            ForEach(ClipboardTransform.builtinMultilineJoiners(), id: \.label) { item in
+                                Button(item.label) {
+                                    transformClipboard { ClipboardTransform.joinLines($0, delimiter: item.delimiter) }
+                                }
+                            }
+                            let custom = ClipboardTransform.customMultilineJoiners()
+                            if !custom.isEmpty {
+                                Divider()
+                                ForEach(custom, id: \.label) { item in
+                                    Button(item.label) {
+                                        transformClipboard { ClipboardTransform.joinLines($0, delimiter: item.delimiter) }
+                                    }
+                                }
+                            }
+                        }
+                        Divider()
+                        Button("→ JSON Array (typed)") {
+                            transformClipboardIfValid { input in
+                                ClipboardTransform.linesToTypedJsonArray(input)
+                            }
+                        }
+                        Button("→ JSON Array (strings)") {
+                            transformClipboardIfValid { input in
+                                ClipboardTransform.linesToStringJsonArray(input)
+                            }
+                        }
+                        Divider()
+                    }
+                }
+
+                Menu("Awk Lines") {
+                    ForEach(1...10, id: \.self) { n in
+                        Button("{print $\(n)}") {
+                            transformClipboard { input in
+                                ClipboardTransform.awk(input, command: "{print $\(n)}")
+                            }
+                        }
+                    }
+                    Divider()
+                    let customAwkPatterns = ClipboardTransform.customAwkPrintPatterns()
+                    ForEach(customAwkPatterns, id: \.label) { pattern in
+                        Button(pattern.label) {
+                            transformClipboard { input in
+                                ClipboardTransform.awk(input, command: pattern.command)
+                            }
+                        }
+                    }
+                }
+
+                if hasCarriageReturns || shouldShowAll {
+                    Divider()
+                    Button(hasCarriageReturns && !shouldShowAll ? "CRLF → LF (strip \\r) ✨" : "CRLF → LF (strip \\r)") {
+                        transformClipboard(ClipboardTransform.windowsNewlinesToUnix)
                     }
                 }
             }
@@ -534,7 +845,9 @@ struct MenuBarView: View {
                             if shouldShowAll || !clipboardAnalysis.isArrayStructure {
                                 Button("Top-Level Keys") { transformClipboard(ClipboardTransform.jsonTopLevelKeys) }
                             }
-                            Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
+                            if shouldShowAll || !isSimpleLiteralJsonArray {
+                                Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
+                            }
                             if showJSONArrayToCsv {
                                 Button(isJsonArray && !shouldShowAll ? "Array → CSV ✨" : "Array → CSV") {
                                     transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv)
@@ -722,32 +1035,35 @@ struct MenuBarView: View {
         }
         Menu("Set Clipboard Data") {
             Menu("Time") {
-                Button("Epoch (s)") { setClipboardToEpochSeconds() }
-                Button("Epoch (ms)") { setClipboardToEpochMilliseconds() }
-                Divider()
-                Button("SQL DateTime (Local)") { setClipboardToSQLDateTimeLocal() }
-                Button("SQL DateTime (UTC)") { setClipboardToSQLDateTimeUTC() }
-                Divider()
-                Button("RFC3339 (Z)") { setClipboardToRFC3339Z() }
-                Button("RFC3339 (+offset)") { setClipboardToRFC3339WithOffset() }
-                Button("RFC3339 (tz abbrev)") { setClipboardToRFC3339WithAbbreviation() }
-                Divider()
-                Button("RFC1123 (UTC)") { setClipboardToRFC1123UTC() }
-                Divider()
-                Button("YYYY/MM/DD hh:mm:ss (Local)") { setClipboardToYYYYMMDDHHmmssLocal() }
-                Button("YYYY/MM/DD hh:mm:ss (UTC)") { setClipboardToYYYYMMDDHHmmssUTC() }
-                Button("YY/MM/DD hh:mm:ss (Local)") { setClipboardToYYMMDDHHmmssLocal() }
-                Button("YY/MM/DD hh:mm:ss (UTC)") { setClipboardToYYMMDDHHmmssUTC() }
-                Divider()
-                Button("YYYY/MM/DD (Local)") { setClipboardToYYYYMMDDLocal() }
-                Button("YYYY/MM/DD (UTC)") { setClipboardToYYYYMMDDUTC() }
-                Button("YYYY/MM/DD/HH (Local)") { setClipboardToYYYYMMDDHHLocal() }
-                Button("YYYY/MM/DD/HH (UTC)") { setClipboardToYYYYMMDDHHUTC() }
-                Button("YY/MM/DD (Local)") { setClipboardToYYMMDDLocal() }
-                Button("YY/MM/DD (UTC)") { setClipboardToYYMMDDUTC() }
+                Section("Sets Clipboard to Current Time") {
+                    Divider()
+                    Button("Epoch (s)") { setClipboardToEpochSeconds() }
+                    Button("Epoch (ms)") { setClipboardToEpochMilliseconds() }
+                    Divider()
+                    Button("SQL DateTime (Local)") { setClipboardToSQLDateTimeLocal() }
+                    Button("SQL DateTime (UTC)") { setClipboardToSQLDateTimeUTC() }
+                    Divider()
+                    Button("RFC3339 (Z)") { setClipboardToRFC3339Z() }
+                    Button("RFC3339 (+offset)") { setClipboardToRFC3339WithOffset() }
+                    Button("RFC3339 (tz abbrev)") { setClipboardToRFC3339WithAbbreviation() }
+                    Divider()
+                    Button("RFC1123 (UTC)") { setClipboardToRFC1123UTC() }
+                    Divider()
+                    Button("YYYY/MM/DD hh:mm:ss (Local)") { setClipboardToYYYYMMDDHHmmssLocal() }
+                    Button("YYYY/MM/DD hh:mm:ss (UTC)") { setClipboardToYYYYMMDDHHmmssUTC() }
+                    Button("YY/MM/DD hh:mm:ss (Local)") { setClipboardToYYMMDDHHmmssLocal() }
+                    Button("YY/MM/DD hh:mm:ss (UTC)") { setClipboardToYYMMDDHHmmssUTC() }
+                    Divider()
+                    Button("YYYY/MM/DD (Local)") { setClipboardToYYYYMMDDLocal() }
+                    Button("YYYY/MM/DD (UTC)") { setClipboardToYYYYMMDDUTC() }
+                    Button("YYYY/MM/DD/HH (Local)") { setClipboardToYYYYMMDDHHLocal() }
+                    Button("YYYY/MM/DD/HH (UTC)") { setClipboardToYYYYMMDDHHUTC() }
+                    Button("YY/MM/DD (Local)") { setClipboardToYYMMDDLocal() }
+                    Button("YY/MM/DD (UTC)") { setClipboardToYYMMDDUTC() }
+                }
             }
             Menu("Symbol") {
-                Menu("Typography") {
+                Menu("General") {
                     Button("Em dash —") { setClipboardTo("—") }
                     Button("En dash –") { setClipboardTo("–") }
                     Button("Ellipsis …") { setClipboardTo("…") }
@@ -864,13 +1180,15 @@ struct MenuBarView: View {
                     Button("PSV") { setClipboardTo(TestData.psv) }
                     Button("YAML") { setClipboardTo(TestData.yaml) }
                     Button("Fixed-Width (Docker ps)") { setClipboardTo(TestData.fixedWidthDockerContainers) }
+                    Button("Awkable Lines") { setClipboardTo(TestData.awkWhitespaceSample) }
+                    Button("Awkable Lines (slashes)") { setClipboardTo(TestData.awkDelimitedSample) }
                     Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
                     Button("JWT") { setClipboardTo(TestData.jwt) }
                     Button("Base64") { setClipboardTo(ClipboardTransform.base64Encode(TestData.plainText)) }
                     Button("Base64 URL") { setClipboardTo(ClipboardTransform.base64URLEncode(TestData.plainText)) }
                     Button("URL-encoded") { setClipboardTo(TestData.urlEncoded) }
                     Button("Plain text") { setClipboardTo(TestData.plainText) }
-                    Button("Multiline List (Instruments)") { setClipboardTo(TestData.instrumentsList) }
+                    Button("Text List (Instruments)") { setClipboardTo(TestData.instrumentsList) }
                     Button("MySQL CLI Table") { setClipboardTo(TestData.mysqlCLI) }
                     Button("psql CLI Table") { setClipboardTo(TestData.psqlCLI) }
                     Button("sqlite3 CLI Table") { setClipboardTo(TestData.sqlite3CLI) }
@@ -915,9 +1233,14 @@ struct MenuBarView: View {
             }
         }
         Divider()
-        Toggle("Mute Sounds", isOn: $muteSounds)
-        Button("About Clipboard Envy") {
-            openWindow(id: "about")
+        Button {
+            muteSounds.toggle()
+        } label: {
+            Label(muteSounds ? "Unmute Sound Effects" : "Mute Sound Effects",
+                  systemImage: muteSounds ? "speaker.slash" : "speaker")
+        }
+        Button {
+            openWindow(id: "about-clipboard-envy")
             DispatchQueue.main.async {
                 NSApp.activate(ignoringOtherApps: true)
                 if let w = NSApp.windows.first(where: { $0.title == "About Clipboard Envy" }) {
@@ -927,9 +1250,13 @@ struct MenuBarView: View {
                     w.makeKeyAndOrderFront(nil)
                 }
             }
+        } label: {
+            Label("About Clipboard Envy", systemImage: "info.circle")
         }
-        Button("Quit Clipboard Envy") {
+        Button {
             NSApp.terminate(nil)
+        } label: {
+            Label("Quit Clipboard Envy", systemImage: "xmark.circle")
         }
         .onAppear {
             snippetsStore.refresh()

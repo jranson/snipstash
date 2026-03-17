@@ -221,4 +221,22 @@ f93207515c6b   prom/prometheus:v3.2.1              "/bin/prometheus --c…"   2 
 353c77a668f1   influxdb:2.7                        "/entrypoint.sh --re…"   2 months ago   Up 17 seconds   0.0.0.0:8086->8086/tcp, [::]:8086->8086/tcp   environment-influxdb2-1
 76203b2c3a5d   clickhouse/clickhouse-server:25.3   "/entrypoint.sh"         2 months ago   Up 17 seconds   0.0.0.0:8123->8123/tcp, [::]:8123->8123/tcp   environment-clickhouse-1
 """
+
+    /// Sample Awk-style whitespace-delimited table.
+    static let awkWhitespaceSample = """
+Column1 Column2 Column3 Column4 Column5
+     cel1a    cel1b    cel1c    cel1d      cel1e
+cel2a   cel2b cel2c  cel2d           cel2e
+  cel3a cel3b cel3c cel3d cel3e
+              cell4a   cel4b   cell4c   cell4d    cell4e
+"""
+
+    /// Sample Awk-style slash-delimited table (note some blank cells).
+    static let awkDelimitedSample = """
+Column1/Column2/Column3/Column4/Column5
+cell1a/cell1b/cell1c/cell1d/cell1e
+cell2a/cell2b/cell2c//cell2e
+cell3a/cell3b/cell3c/cell3d/cell3e
+cell4a/cell4b//cell4d/cell4e
+"""
 }

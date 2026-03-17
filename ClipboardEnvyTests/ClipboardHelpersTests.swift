@@ -405,6 +405,26 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(ClipboardTransform.jsonAllKeys(bad), bad)
     }
 
+    func testIsSimpleLiteralJsonArray_trueForStringLiterals() {
+        let json = #"["Commas","Spaces","CommaSpaces","Tabs","Pipes","Colons","Semicolons"]"#
+        XCTAssertTrue(ClipboardTransform.isSimpleLiteralJsonArray(json))
+    }
+
+    func testIsSimpleLiteralJsonArray_trueForNumericAndBooleanLiterals() {
+        let json = #"[1,2,3,4,true,false,null]"#
+        XCTAssertTrue(ClipboardTransform.isSimpleLiteralJsonArray(json))
+    }
+
+    func testIsSimpleLiteralJsonArray_falseForArrayOfObjects() {
+        let json = #"[{"a":1},{"b":2}]"#
+        XCTAssertFalse(ClipboardTransform.isSimpleLiteralJsonArray(json))
+    }
+
+    func testIsSimpleLiteralJsonArray_falseForNestedArrays() {
+        let json = #"[[1,2],[3,4]]"#
+        XCTAssertFalse(ClipboardTransform.isSimpleLiteralJsonArray(json))
+    }
+
     // MARK: - YAML
 
     func testYamlPrettifyMinify() {
@@ -994,6 +1014,310 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(ClipboardTransform.trimLines("  a  \n  b  "), "a\nb")
         XCTAssertEqual(ClipboardTransform.trimLines("no padding"), "no padding")
         XCTAssertEqual(ClipboardTransform.trimLines("\t hello \t\n world"), "hello\nworld")
+    }
+
+    func testTrimTrailingCommas() {
+        let input = "a,\nb ,  \nc"
+        XCTAssertEqual(ClipboardTransform.trimTrailingCommas(input), "a\nb  \nc")
+    }
+
+    func testTrimTrailingSemicolons() {
+        let input = "a;\nb ;\nc ;   \nd"
+        XCTAssertEqual(ClipboardTransform.trimTrailingSemicolons(input), "a\nb\nc   \nd")
+    }
+
+    func testRemoveUniqueLines() {
+        let input = "a\nb\na\nc\nc\nd"
+        XCTAssertEqual(ClipboardTransform.removeUniqueLines(input), "a\na\nc\nc")
+    }
+
+    func testKeepUniqueLines() {
+        let input = "a\nb\na\nc\nc\nd"
+        XCTAssertEqual(ClipboardTransform.keepUniqueLines(input), "b\nd")
+    }
+
+    func testKeepDuplicateLinesCollapsed() {
+        let input = "a\nb\na\nc\nc\nd"
+        XCTAssertEqual(ClipboardTransform.keepDuplicateLinesCollapsed(input), "a\nc")
+    }
+
+    func testSortLinesByFrequencyAscending() {
+        let input = "a\nb\na\nc\nc\nc"
+        let output = ClipboardTransform.sortLinesByFrequencyAscending(input)
+        XCTAssertTrue(output.hasPrefix("b\n"))
+    }
+
+    func testSortLinesByFrequencyDescending() {
+        let input = "a\nb\na\nc\nc\nc"
+        let output = ClipboardTransform.sortLinesByFrequencyDescending(input)
+        XCTAssertTrue(output.hasPrefix("c\n"))
+    }
+
+    func testWrapLines_basic() {
+        let input = "a\nb\n"
+        XCTAssertEqual(ClipboardTransform.wrapLines(input, prefix: "\"", suffix: "\""), "\"a\"\n\"b\"\n")
+    }
+
+    func testUnwrapLines_basic() {
+        let input = "\"a\"\n\"b\""
+        XCTAssertEqual(ClipboardTransform.unwrapLines(input, prefix: "\"", suffix: "\""), "a\nb")
+    }
+
+    func testUnwrapLines_handlesOnlyPrefixOrSuffix() {
+        let input = "[a\nb]"
+        XCTAssertEqual(ClipboardTransform.unwrapLines(input, prefix: "[", suffix: "]"), "a\nb")
+    }
+
+    func testBuiltinMultilineWrappers_containsExpectedEntries() {
+        let labels = ClipboardTransform.builtinMultilineWrappers().map { $0.label }
+        XCTAssertTrue(labels.contains("\"line\""))
+        XCTAssertTrue(labels.contains("`line`"))
+        XCTAssertTrue(labels.contains("'line'"))
+        XCTAssertTrue(labels.contains("\"line\","))
+        XCTAssertTrue(labels.contains("[line]"))
+        XCTAssertTrue(labels.contains("- line"))
+        XCTAssertTrue(labels.contains("// line"))
+    }
+
+    func testCustomMultilineWrappers_parsesDefaultsDictionary() {
+        let defaults = UserDefaults.standard
+        let key = "TextLineWrappers"
+        let entryKey = "AngleBrackets"
+        let entryValue = "<|>"
+        let original = defaults.dictionary(forKey: key)
+
+        var dict = original ?? [:]
+        dict[entryKey] = entryValue
+        defaults.set(dict, forKey: key)
+
+        let items = ClipboardTransform.customMultilineWrappers()
+        XCTAssertTrue(items.contains { $0.label == entryKey && $0.prefix == "<" && $0.suffix == ">" })
+
+        if let original = original {
+            defaults.set(original, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    func testJoinLines_basic() {
+        let input = "a\nb\nc"
+        XCTAssertEqual(ClipboardTransform.joinLines(input, delimiter: ","), "a,b,c")
+    }
+
+    func testSplitLines_basic() {
+        let input = "a,b,c"
+        XCTAssertEqual(ClipboardTransform.splitLines(on: ",", input), "a\nb\nc")
+    }
+
+    func testBuiltinMultilineJoiners_containsExpectedDefaults() {
+        let labels = ClipboardTransform.builtinMultilineJoiners().map { $0.label }
+        XCTAssertTrue(labels.contains("Commas"))
+        XCTAssertTrue(labels.contains("Spaces"))
+        XCTAssertTrue(labels.contains("Tabs"))
+    }
+
+    func testLinesToTypedJsonArray_infersTypesAndHonorsQuotedStrings() throws {
+        let input = """
+        1
+        2.5
+        true
+        "hello"
+        'world'
+        """
+        let json = ClipboardTransform.linesToTypedJsonArray(input)
+        let data = try XCTUnwrap(json.data(using: .utf8))
+        let arr = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [Any])
+        XCTAssertEqual(arr.count, 5)
+        XCTAssertEqual(arr[0] as? Int, 1)
+        XCTAssertEqual(arr[1] as? Double, 2.5)
+        XCTAssertEqual(arr[2] as? Bool, true)
+        XCTAssertEqual(arr[3] as? String, "hello")
+        XCTAssertEqual(arr[4] as? String, "world")
+    }
+
+    func testLinesToStringJsonArray_preservesLineCount() throws {
+        let input = "a\nb\nc"
+        let json = ClipboardTransform.linesToStringJsonArray(input)
+        let data = try XCTUnwrap(json.data(using: .utf8))
+        let arr = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String])
+        XCTAssertEqual(arr, ["a", "b", "c"])
+    }
+
+    func testSimpleLiteralJsonArrayToLines_basic() {
+        let json = #"["Commas","Spaces","Tabs"]"#
+        let lines = ClipboardTransform.simpleLiteralJsonArrayToLines(json)
+        XCTAssertEqual(lines, "Commas\nSpaces\nTabs")
+    }
+
+    func testRemoveSubstring_andCustomMultilineRemoves() {
+        let input = "a,b,c"
+        let expectedAfterRemove = "abc"
+        XCTAssertEqual(ClipboardTransform.removeSubstring(input, target: ","), expectedAfterRemove)
+
+        let defaults = UserDefaults.standard
+        let key = "TextRemoves"
+        let entryKey = "NoCommas"
+        let entryValue = ","
+        let original = defaults.dictionary(forKey: key)
+
+        var dict = original ?? [:]
+        dict[entryKey] = entryValue
+        defaults.set(dict, forKey: key)
+
+        let custom = ClipboardTransform.customMultilineRemoves()
+        XCTAssertTrue(custom.contains { $0.label == entryKey && $0.target == entryValue })
+
+        if let original = original {
+            defaults.set(original, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    func testRemoveZeroWidthCharacters() {
+        let input = "a\u{200B}b\u{FEFF}c"
+        XCTAssertEqual(ClipboardTransform.removeZeroWidthCharacters(input), "abc")
+    }
+
+    func testSwapSubstrings_andCustomMultilineSwaps() {
+        let input = "a.b.c"
+        let expectedAfterSwap = "a,b,c"
+        XCTAssertEqual(ClipboardTransform.swapSubstrings(input, from: ".", to: ","), expectedAfterSwap)
+
+        let defaults = UserDefaults.standard
+        let key = "TextSwaps"
+        let entryKey = "DotsToCommas"
+        let entryValue = ". -> ,"
+        let original = defaults.dictionary(forKey: key)
+
+        var dict = original ?? [:]
+        dict[entryKey] = entryValue
+        defaults.set(dict, forKey: key)
+
+        let custom = ClipboardTransform.customMultilineSwaps()
+        XCTAssertTrue(custom.contains { $0.label == entryKey && $0.from == "." && $0.to == "," })
+
+        if let original = original {
+            defaults.set(original, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    func testAwkPrintColumns_whitespaceDelimiter_basic() {
+        let input = TestData.awkWhitespaceSample
+
+        // Print $1: header + first column values.
+        let result1 = ClipboardTransform.awkPrintColumns(input, columns: [1])
+        XCTAssertEqual(result1, """
+        Column1
+        cel1a
+        cel2a
+        cel3a
+        cell4a
+        """)
+
+        // Print $3: header + third column values.
+        let result3 = ClipboardTransform.awkPrintColumns(input, columns: [3])
+        XCTAssertEqual(result3, """
+        Column3
+        cel1c
+        cel2c
+        cel3c
+        cell4c
+        """)
+    }
+
+    func testAwkPrintColumns_whitespaceDelimiter_outOfRangeProducesBlankLine() {
+        let input = "onlyOneColumn"
+        let result = ClipboardTransform.awkPrintColumns(input, columns: [3])
+        XCTAssertEqual(result, "")
+    }
+
+    func testAwkPrintColumns_customDelimiter_preservesEmptyColumnsBetweenDelimiters() {
+        let input = TestData.awkDelimitedSample
+
+        // Print $3 and $2 via explicit columns helper; note blank cells preserved.
+        let result3 = ClipboardTransform.awkPrintColumns(input, columns: [3, 2], delimiter: "/")
+        XCTAssertEqual(result3, """
+        Column3 Column2
+        cell1c cell1b
+        cell2c cell2b
+        cell3c cell3b
+        cell4b
+        """)
+
+        // Print $4: header + fourth column values; note blank for row3 (cell2d).
+        let result4 = ClipboardTransform.awkPrintColumns(input, columns: [4], delimiter: "/")
+        XCTAssertEqual(result4, """
+        Column4
+        cell1d
+        
+        cell3d
+        cell4d
+        """)
+    }
+
+    func testAwk_parser_whitespace_defaultDelimiter() {
+        let input = TestData.awkWhitespaceSample
+        let cmd = "{print $1\"-\"$3}"
+        let result = ClipboardTransform.awk(input, command: cmd)
+        XCTAssertEqual(result, """
+        Column1-Column3
+        cel1a-cel1c
+        cel2a-cel2c
+        cel3a-cel3c
+        cell4a-cell4c
+        """)
+    }
+
+    func testAwk_parser_customDelimiter_andLiterals() {
+        let input = TestData.awkDelimitedSample
+        let cmd = "-d '/' {print \"C3=\"$3\" C5=\"$5}"
+        let result = ClipboardTransform.awk(input, command: cmd)
+        XCTAssertEqual(result, """
+        C3=Column3 C5=Column5
+        C3=cell1c C5=cell1e
+        C3=cell2c C5=cell2e
+        C3=cell3c C5=cell3e
+        C3= C5=cell4e
+        """)
+    }
+
+    func testCustomAwkPrintPatterns_parsesDefaultsDictionary() {
+        let defaults = UserDefaults.standard
+        let key = "AwkPrintPatterns"
+        let entryKey = "FirstAndThird"
+        let entryValue = "{print $1\"-\"$3}"
+        let original = defaults.dictionary(forKey: key)
+
+        var dict = original ?? [:]
+        dict[entryKey] = entryValue
+        defaults.set(dict, forKey: key)
+
+        let patterns = ClipboardTransform.customAwkPrintPatterns()
+        XCTAssertTrue(patterns.contains { $0.label == entryKey && $0.command == entryValue })
+
+        if let original = original {
+            defaults.set(original, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    func testAwkPrintColumns_multipleColumns_joinedWithSpace() {
+        let input = "a,b,c,d"
+        let result = ClipboardTransform.awkPrintColumns(input, columns: [1, 3], delimiter: ",")
+        XCTAssertEqual(result, "a c")
+    }
+
+    // Deprecated: column-based Awk patterns have been replaced by AwkPrintPatterns.
+
+    func testFancyQuotesToStraight() {
+        let input = "“hello” ‘world’"
+        let output = ClipboardTransform.fancyQuotesToStraight(input)
+        XCTAssertEqual(output, "\"hello\" 'world'")
     }
 
     func testHeadLines_basic() {
