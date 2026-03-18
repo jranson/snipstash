@@ -60,10 +60,16 @@ struct ClipboardEnvyApp: App {
         .modelContainer(Self.sharedModelContainer)
         .defaultSize(width: 560, height: 420)
 
-        Window("About Clipboard Envy", id: "about-clipboard-envy") {
+        Window("About \(BuildInfo.appName)", id: "about-clipboard-envy") {
             AboutClipboardEnvyView()
         }
         .defaultSize(width: 520, height: 540)
+        .windowResizability(.contentSize)
+
+        Window("\(BuildInfo.appName) Settings", id: "settings-clipboard-envy") {
+            SettingsClipboardEnvyView()
+        }
+        .defaultSize(width: 780, height: 548)
         .windowResizability(.contentSize)
     }
 }

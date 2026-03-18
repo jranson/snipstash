@@ -9,7 +9,7 @@
 import Foundation
 
 enum BuildInfo {
-    /// AppName
+    /// App display name (single source of truth for UI text).
     static var appName: String {
         "Clipboard Envy"
     }

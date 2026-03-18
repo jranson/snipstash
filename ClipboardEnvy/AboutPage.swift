@@ -9,7 +9,7 @@ import AppKit
 struct AboutClipboardEnvyView: View {
     private let githubURL = URL(string: "https://github.com/centennial-oss/clipboard-envy")!
     private let appStoreReviewURL = URL(string: "https://apps.apple.com/us/app/clipboard-envy/id6759918875?action=write-review")!
-    private static let windowTitle = "About Clipboard Envy"
+    private static let windowTitle = "About \(BuildInfo.appName)"
     @State private var escapeMonitor: Any? = nil
     @State private var isGitHubLinkHovered = false
     @State private var isAppStoreLinkHovered = false
@@ -35,13 +35,13 @@ struct AboutClipboardEnvyView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
 
-            Label("Clipboard Envy is 100% private. It does not snoop or collect analytics.", systemImage: "shield")
+            Label("\(BuildInfo.appName) is 100% private. It does not snoop or collect analytics.", systemImage: "shield")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
             
-            Label("Clipboard Envy was vibecoded with Claude, ChatGPT & Cursor.\nIt is completely free and open source for you to enjoy.", systemImage: "heart")
+            Label("\(BuildInfo.appName) was vibecoded with Claude, ChatGPT & Cursor.\nIt is completely free and open source for you to enjoy.", systemImage: "heart")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)
@@ -82,7 +82,7 @@ struct AboutClipboardEnvyView: View {
                 .padding(.leading, 32)
             }
 
-            Label("Clipboard Envy is not a password manager and should not be used to store passwords or other secrets. Use a dedicated password manager like Apple Passwords for sensitive credentials.", systemImage: "exclamationmark.triangle")
+            Label("\(BuildInfo.appName) is not a password manager and should not be used to store passwords or other secrets. Use a dedicated password manager like Apple Passwords for sensitive credentials.", systemImage: "exclamationmark.triangle")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)

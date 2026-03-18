@@ -1246,16 +1246,10 @@ struct MenuBarView: View {
         }
         Divider()
         Button {
-            muteSounds.toggle()
-        } label: {
-            Label(muteSounds ? "Unmute Sound Effects" : "Mute Sound Effects",
-                  systemImage: muteSounds ? "speaker.slash" : "speaker")
-        }
-        Button {
-            openWindow(id: "about-clipboard-envy")
+            openWindow(id: "settings-clipboard-envy")
             DispatchQueue.main.async {
                 NSApp.activate(ignoringOtherApps: true)
-                if let w = NSApp.windows.first(where: { $0.title == "About Clipboard Envy" }) {
+                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "settings-clipboard-envy" }) {
                     if w.isMiniaturized {
                         w.deminiaturize(nil)
                     }
@@ -1263,12 +1257,26 @@ struct MenuBarView: View {
                 }
             }
         } label: {
-            Label("About Clipboard Envy", systemImage: "info.circle")
+            Label("Settings…", systemImage: "gearshape")
+        }
+        Button {
+            openWindow(id: "about-clipboard-envy")
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "about-clipboard-envy" }) {
+                    if w.isMiniaturized {
+                        w.deminiaturize(nil)
+                    }
+                    w.makeKeyAndOrderFront(nil)
+                }
+            }
+        } label: {
+            Label("About \(BuildInfo.appName)", systemImage: "info.circle")
         }
         Button {
             NSApp.terminate(nil)
         } label: {
-            Label("Quit Clipboard Envy", systemImage: "xmark.circle")
+            Label("Quit \(BuildInfo.appName)", systemImage: "xmark.circle")
         }
         .onAppear {
             snippetsStore.refresh()
