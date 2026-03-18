@@ -364,28 +364,29 @@ struct MenuBarView: View {
         if clipboardAnalysis.dataType != .nonText {
             Menu("Transform Clipboard Data") {
             Menu(generalTextMenuLabel) {
-                Button("UPPERCASE") { transformClipboard(ClipboardTransform.uppercase) }
-                Button("lowercase") { transformClipboard(ClipboardTransform.lowercase) }
-                Button("Trimmed") { transformClipboard(ClipboardTransform.trimmed) }
-                Button("trim+lowercase") { transformClipboard(ClipboardTransform.lowercaseTrimmed) }
-                Divider()
-                Button("Title Case") { transformClipboard(ClipboardTransform.titleCase) }
-                Button("Sentence case") { transformClipboard(ClipboardTransform.sentenceCase) }
-                Divider()
-                Button("camelCase") { transformClipboard(ClipboardTransform.camelCase) }
-                Button("PascalCase") { transformClipboard(ClipboardTransform.pascalCase) }
-                Button("kebab-slug-case") { transformClipboard(ClipboardTransform.slugify) }
-                Button("snake_case") { transformClipboard(ClipboardTransform.snakeCase) }
-                Button("CONST_CASE") { transformClipboard(ClipboardTransform.constCase) }
                 if isSimpleLiteralJsonArray {
-                    Divider()
                     Button("Split JSON Array ✨") {
                         transformClipboardIfValid { input in
                             ClipboardTransform.simpleLiteralJsonArrayToLines(input) ?? input
                         }
                     }
+                    Divider()
                 }
-                Divider()
+                Menu("Casing") {
+                    Button("UPPERCASE") { transformClipboard(ClipboardTransform.uppercase) }
+                    Button("lowercase") { transformClipboard(ClipboardTransform.lowercase) }
+                    Button("Trimmed") { transformClipboard(ClipboardTransform.trimmed) }
+                    Button("trim+lowercase") { transformClipboard(ClipboardTransform.lowercaseTrimmed) }
+                    Divider()
+                    Button("Title Case") { transformClipboard(ClipboardTransform.titleCase) }
+                    Button("Sentence case") { transformClipboard(ClipboardTransform.sentenceCase) }
+                    Divider()
+                    Button("camelCase") { transformClipboard(ClipboardTransform.camelCase) }
+                    Button("PascalCase") { transformClipboard(ClipboardTransform.pascalCase) }
+                    Button("kebab-slug-case") { transformClipboard(ClipboardTransform.slugify) }
+                    Button("snake_case") { transformClipboard(ClipboardTransform.snakeCase) }
+                    Button("CONST_CASE") { transformClipboard(ClipboardTransform.constCase) }
+                }
                 Menu(appendSparkleIf("Remove", condition: hasZeroWidthCharacters)) {
                     Button("Single Quotes") {
                         transformClipboard { ClipboardTransform.removeSubstring($0, target: "'") }
@@ -813,7 +814,7 @@ struct MenuBarView: View {
                 }
 
                 Menu("Awk Lines") {
-                    ForEach(1...10, id: \.self) { n in
+                    ForEach(1...8, id: \.self) { n in
                         Button("{print $\(n)}") {
                             transformClipboard { input in
                                 ClipboardTransform.awk(input, command: "{print $\(n)}")

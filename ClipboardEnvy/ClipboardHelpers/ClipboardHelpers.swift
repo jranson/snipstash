@@ -17,19 +17,46 @@ enum Argon2Params {
     }
 }
 
-// MARK: - Feedback sounds
+// MARK: - Feedback sounds (UserDefaults-backed)
 
 @MainActor
 enum ClipboardSound {
-    static func playClipboardWritten(muted: Bool) {
-        guard !muted, let snd = NSSound(named: "Frog") else { return }
-        snd.volume = 0.25
+    private static let writtenSoundKey  = "clipboardWrittenSound"
+    private static let writtenVolumeKey = "clipboardWrittenVolume"
+    private static let errorSoundKey    = "clipboardErrorSound"
+    private static let errorVolumeKey   = "clipboardErrorVolume"
+
+    private static func currentWrittenSoundName() -> String {
+        UserDefaults.standard.string(forKey: writtenSoundKey) ?? "Frog"
+    }
+
+    private static func currentErrorSoundName() -> String {
+        UserDefaults.standard.string(forKey: errorSoundKey) ?? "Beep"
+    }
+
+    private static func currentWrittenVolume() -> Int {
+        let v = UserDefaults.standard.object(forKey: writtenVolumeKey) as? Int ?? 50
+        return max(0, min(100, v))
+    }
+
+    private static func currentErrorVolume() -> Int {
+        let v = UserDefaults.standard.object(forKey: errorVolumeKey) as? Int ?? 50
+        return max(0, min(100, v))
+    }
+
+    private static func playSound(named soundName: String, volume: Int, muted: Bool) {
+        guard !muted, volume > 0 else { return }
+        guard let snd = NSSound(named: soundName) else { return }
+        snd.volume = Float(volume) / 100.0
         snd.play()
     }
 
+    static func playClipboardWritten(muted: Bool) {
+        playSound(named: currentWrittenSoundName(), volume: currentWrittenVolume(), muted: muted)
+    }
+
     static func playClipboardError(muted: Bool) {
-        guard !muted else { return }
-        NSSound.beep()
+        playSound(named: currentErrorSoundName(), volume: currentErrorVolume(), muted: muted)
     }
 }
 
@@ -252,6 +279,3 @@ enum ClipboardSet {
     static let waltzBadNymphPlaceholder = "Waltz, bad nymph, for quick jigs vex!"
     static let jackdawsPlaceholder = "Jackdaws love my big sphinx of quartz."
 }
-
-
-

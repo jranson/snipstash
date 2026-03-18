@@ -49,8 +49,8 @@ struct AboutClipboardEnvyView: View {
 
             Link(destination: githubURL) {
                 Label("GitHub: centennial-oss/clipboard-envy", systemImage: "arrow.up.right.square")
-                    .foregroundStyle(Color.accentColor)
-                    .underline(isGitHubLinkHovered, color: Color.accentColor.opacity(0.8))
+                    .foregroundStyle(Color(nsColor: .linkColor))
+                    .underline(isGitHubLinkHovered, color: Color(nsColor: .linkColor).opacity(0.8))
             }
             .font(.system(size: 15))
             .onHover { isHovering in
@@ -91,8 +91,8 @@ struct AboutClipboardEnvyView: View {
             HStack(spacing: 12) {
                 Link(destination: appStoreReviewURL) {
                     Label("Rate on the Mac App Store", systemImage: "star.leadinghalf.filled")
-                        .foregroundStyle(Color.accentColor)
-                        .underline(isAppStoreLinkHovered, color: Color.accentColor.opacity(0.8))
+                        .foregroundStyle(Color(nsColor: .linkColor))
+                        .underline(isAppStoreLinkHovered, color: Color(nsColor: .linkColor).opacity(0.8))
                 }
                 .font(.system(size: 14))
                 .onHover { isHovering in

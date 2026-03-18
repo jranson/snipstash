@@ -30,7 +30,7 @@ private struct DictSectionConfig {
 }
 
 private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
-    case general      = "General"
+    case soundEffects = "Sound Effects"
     case removeLines  = "Remove Lines Menu"
     case splitJoin    = "Split / Join Menus"
     case textRemoves  = "Remove Text Menu"
@@ -43,7 +43,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
-        case .general:      return "gearshape"
+        case .soundEffects:      return "speaker"
         case .argon2:       return "lock.shield"
         case .removeLines:  return "list.number"
         case .splitJoin:    return "scissors"
@@ -178,12 +178,141 @@ private struct SectionTitle: View {
     }
 }
 
+private struct SystemSoundOption: Identifiable {
+    let id: String
+    let osName: String
+}
+
+private struct ClipboardSoundRow: View {
+    let title: String
+    @Binding var selectedSoundID: String
+    let volumeBinding: Binding<Double>
+    let volumeValue: Int
+    let options: [SystemSoundOption]
+    let onPlay: () -> Void
+
+    @State private var isHoveringPlay = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13))
+                Spacer()
+                HStack(spacing: 16) {
+                    Picker(title, selection: $selectedSoundID) {
+                        ForEach(options) { option in
+                            Text(option.osName).tag(option.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+
+                    Button {
+                        onPlay()
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(
+                                (isHoveringPlay ? Color(nsColor: .linkColor) : Color.primary)
+                                    .opacity(isHoveringPlay ? 1 : 0.65)
+                            )
+                            .padding(6)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(
+                                        (isHoveringPlay ? Color(nsColor: .linkColor) : Color.primary)
+                                            .opacity(isHoveringPlay ? 1 : 0.65),
+                                        lineWidth: 1
+                                    )
+                            )
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 4)
+                    .onHover { hovering in
+                        isHoveringPlay = hovering
+                    }
+                    .help("Play selected sound at current volume")
+                }
+            }
+
+            Divider()
+
+            HStack {
+                Text("Volume")
+                    .font(.system(size: 13))
+                Spacer()
+                DiscreteVolumeSlider(value: volumeBinding, range: 0...100)
+                    .frame(maxWidth: 175)
+                Text("\(volumeValue)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, alignment: .center)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1)
+        )
+    }
+}
+
+private struct DiscreteVolumeSlider: NSViewRepresentable {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(value: $value)
+    }
+
+    func makeNSView(context: Context) -> NSSlider {
+        let slider = NSSlider(
+            value: value,
+            minValue: range.lowerBound,
+            maxValue: range.upperBound,
+            target: context.coordinator,
+            action: #selector(Coordinator.valueChanged(_:))
+        )
+        slider.numberOfTickMarks = 0
+        slider.allowsTickMarkValuesOnly = false
+        slider.isContinuous = true
+        return slider
+    }
+
+    func updateNSView(_ nsView: NSSlider, context: Context) {
+        nsView.minValue = range.lowerBound
+        nsView.maxValue = range.upperBound
+        if nsView.doubleValue != value {
+            nsView.doubleValue = value
+        }
+    }
+
+    final class Coordinator: NSObject {
+        private var value: Binding<Double>
+
+        init(value: Binding<Double>) {
+            self.value = value
+        }
+
+        @objc
+        func valueChanged(_ sender: NSSlider) {
+            value.wrappedValue = sender.doubleValue.rounded()
+        }
+    }
+}
+
 // MARK: - Main Settings View
 
 struct SettingsClipboardEnvyView: View {
     private static let windowTitle = "\(BuildInfo.appName) Settings"
     @Environment(\.colorScheme) private var colorScheme
-    @State private var selectedSection: SettingsSection? = .general
+    @State private var selectedSection: SettingsSection? = .soundEffects
     @State private var escapeMonitor: Any? = nil
     
     private var selectedSectionBinding: Binding<SettingsSection?> {
@@ -191,7 +320,7 @@ struct SettingsClipboardEnvyView: View {
             get: { selectedSection },
             set: { newValue in
                 // Avoid nil selection (which can leave the detail pane blank).
-                selectedSection = newValue ?? selectedSection ?? .general
+                selectedSection = newValue ?? selectedSection ?? .soundEffects
             }
         )
     }
@@ -270,8 +399,8 @@ struct SettingsClipboardEnvyView: View {
                                 )
                             } else {
                                 switch section {
-                                case .general:
-                                    GeneralSettingsView()
+                                case .soundEffects:
+                                    SoundEffectsSettingsView()
                                 case .argon2:
                                     Argon2SettingsView()
                                 case .removeLines:
@@ -284,7 +413,7 @@ struct SettingsClipboardEnvyView: View {
                             Color.clear
                         }
                     }
-                    .id(selectedSection?.id ?? SettingsSection.general.id)
+                    .id(selectedSection?.id ?? SettingsSection.soundEffects.id)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -337,27 +466,91 @@ struct SettingsClipboardEnvyView: View {
 
 // MARK: - General Settings
 
-private struct GeneralSettingsView: View {
+private struct SoundEffectsSettingsView: View {
     @AppStorage("muteQuickSaveSounds") private var muteSounds = false
+    @AppStorage("clipboardWrittenSound") private var clipboardWrittenSound = "Frog"
+    @AppStorage("clipboardWrittenVolume") private var clipboardWrittenVolume = 25
+    @AppStorage("clipboardErrorSound") private var clipboardErrorSound = "Tink"
+    @AppStorage("clipboardErrorVolume") private var clipboardErrorVolume = 40
+
+    /// Internal NSSound names mapped to current macOS UI names where they differ.
+    private let soundOptions: [SystemSoundOption] = [
+        .init(id: "Tink", osName: "Boop"),
+        .init(id: "Blow", osName: "Breeze"),
+        .init(id: "Pop", osName: "Bubble"),
+        .init(id: "Glass", osName: "Crystal"),
+        .init(id: "Funk", osName: "Funky"),
+        .init(id: "Hero", osName: "Heroine"),
+        .init(id: "Frog", osName: "Jump"),
+        .init(id: "Basso", osName: "Mezzo"),
+        .init(id: "Bottle", osName: "Pebble"),
+        .init(id: "Purr", osName: "Pluck"),
+        .init(id: "Morse", osName: "Pong"),
+        .init(id: "Ping", osName: "Sonar"),
+        .init(id: "Sosumi", osName: "Sonumi"),
+        .init(id: "Submarine", osName: "Submerge"),
+    ]
+
+    private var writtenVolumeBinding: Binding<Double> {
+        Binding(
+            get: { Double(clipboardWrittenVolume) },
+            set: { clipboardWrittenVolume = Int($0.rounded()) }
+        )
+    }
+
+    private var errorVolumeBinding: Binding<Double> {
+        Binding(
+            get: { Double(clipboardErrorVolume) },
+            set: { clipboardErrorVolume = Int($0.rounded()) }
+        )
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                SectionTitle(title: "General")
+                SectionTitle(title: "Sound Effects")
 
                 SettingsCard {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Mute Sound Effects")
-                                .font(.system(size: 14))
-                            Text("Silence audio feedback on clipboard operations.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Mute Sound Effects")
+                                    .font(.system(size: 14))
+                                Text("Silence audio feedback on clipboard operations.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $muteSounds)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
                         }
-                        Spacer()
-                        Toggle("", isOn: $muteSounds)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
+
+                        ClipboardSoundRow(
+                            title: "Clipboard Written Sound",
+                            selectedSoundID: $clipboardWrittenSound,
+                            volumeBinding: writtenVolumeBinding,
+                            volumeValue: clipboardWrittenVolume,
+                            options: soundOptions,
+                            onPlay: {
+                                Task { @MainActor in
+                                    ClipboardSound.playClipboardWritten(muted: muteSounds)
+                                }
+                            }
+                        )
+
+                        ClipboardSoundRow(
+                            title: "Clipboard Error Sound",
+                            selectedSoundID: $clipboardErrorSound,
+                            volumeBinding: errorVolumeBinding,
+                            volumeValue: clipboardErrorVolume,
+                            options: soundOptions,
+                            onPlay: {
+                                Task { @MainActor in
+                                    ClipboardSound.playClipboardError(muted: muteSounds)
+                                }
+                            }
+                        )
                     }
                     .padding(16)
                 }
@@ -543,9 +736,9 @@ private struct RemoveLinesSettingsView: View {
             .buttonStyle(.plain)
             .padding(.trailing, 8)
         }
-        .background(Color.accentColor.opacity(0.12))
+        .background(Color(nsColor: .linkColor).opacity(0.12))
         .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 1))
+        .overlay(Capsule().strokeBorder(Color(nsColor: .linkColor).opacity(0.3), lineWidth: 1))
     }
 
     private func loadValues() {
