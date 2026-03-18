@@ -3,6 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 import Security
+import Carbon.HIToolbox
 
 // MARK: - Argon2 parameters (UserDefaults-backed)
 
@@ -278,4 +279,48 @@ enum ClipboardSet {
     static let sphinxOfBlackQuartzPlaceholder = "Sphinx of black quartz, judge my vow."
     static let waltzBadNymphPlaceholder = "Waltz, bad nymph, for quick jigs vex!"
     static let jackdawsPlaceholder = "Jackdaws love my big sphinx of quartz."
+}
+
+// MARK: - Keyboard shortcuts (Cmd+C / Cmd+V)
+
+enum KeyboardShortcut {
+    enum ShortcutError: LocalizedError, CustomStringConvertible {
+        case failedToCreateEventSource
+        case failedToCreateKeyEvent
+
+        var description: String {
+            switch self {
+            case .failedToCreateEventSource: return "Failed to create keyboard event source."
+            case .failedToCreateKeyEvent: return "Failed to create keyboard event."
+            }
+        }
+
+        var errorDescription: String? { description }
+    }
+
+    private static func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags) throws {
+        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+            throw ShortcutError.failedToCreateEventSource
+        }
+        source.localEventsSuppressionInterval = 0
+
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
+            throw ShortcutError.failedToCreateKeyEvent
+        }
+
+        keyDown.flags = flags
+        keyUp.flags = flags
+
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
+    }
+
+    static func commandC() throws {
+        try postKey(CGKeyCode(kVK_ANSI_C), flags: .maskCommand)
+    }
+
+    static func commandV() throws {
+        try postKey(CGKeyCode(kVK_ANSI_V), flags: .maskCommand)
+    }
 }

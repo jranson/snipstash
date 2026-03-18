@@ -4,6 +4,11 @@ import AppKit
 
 @MainActor
 struct MenuBarView: View {
+    private static let recentSnippetsMenuCountRange: ClosedRange<Int> = 0...20
+    @AppStorage("recentSnippetsMenuCount") private var recentSnippetsMenuCount = 10
+    private static let snippetMenuLabelMaxCharsRange: ClosedRange<Int> = 10...64
+    @AppStorage("snippetMenuLabelMaxChars") private var snippetMenuLabelMaxChars = 36
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openWindow) private var openWindow
     @EnvironmentObject private var editorStore: EditorStore
@@ -304,6 +309,23 @@ struct MenuBarView: View {
         return snippets
     }
 
+    private var recentDisplayedSnippets: [Snippet] {
+        let limit = min(
+            max(recentSnippetsMenuCount, Self.recentSnippetsMenuCountRange.lowerBound),
+            Self.recentSnippetsMenuCountRange.upperBound
+        )
+
+        // Pick the most-recently modified snippets by timestamp,
+        // but preserve the existing menu ordering (so Move Up/Down semantics match).
+        let recentIDs = Set(
+            displayedSnippets
+                .sorted { $0.timestamp > $1.timestamp }
+                .prefix(limit)
+                .map(\.id)
+        )
+        return displayedSnippets.filter { recentIDs.contains($0.id) }
+    }
+
     #if DEBUG
     /// Demo snippets for App Store screenshots.
     private static let demoSnippets: [Snippet] = {
@@ -362,7 +384,7 @@ struct MenuBarView: View {
             }
         }
         if clipboardAnalysis.dataType != .nonText {
-            Menu("Transform Clipboard Data") {
+            Menu("Transform Clipboard Text") {
             Menu(generalTextMenuLabel) {
                 if isSimpleLiteralJsonArray {
                     Button("Split JSON Array ✨") {
@@ -592,53 +614,7 @@ struct MenuBarView: View {
                     }
                 }
             }
-            Menu(encodeHashMenuLabel) {
-                Section("URL") {
-                    Button("Encode") { transformClipboard(ClipboardTransform.urlEncode) }
-                    if showURLDecode {
-                        Button(appendSparkleIf("Decode", condition: isPossiblyURLEncoded && !shouldShowAll)) {
-                            transformClipboard(ClipboardTransform.urlDecode)
-                        }
-                    }
-                }
-                Section("Base64") {
-                    Button("Encode") { transformClipboard(ClipboardTransform.base64Encode) }
-                    if showBase64Decode {
-                        Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64 && !shouldShowAll)) {
-                            transformClipboard(ClipboardTransform.base64Decode)
-                        }
-                    }
-                }
-                Section("Base64 URL-Safe") {
-                    Button("Encode") { transformClipboard(ClipboardTransform.base64URLEncode) }
-                    if showBase64URLDecode {
-                        Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64URL && !shouldShowAll)) {
-                            transformClipboard(ClipboardTransform.base64URLDecode)
-                        }
-                    }
-                }
-                if showJWTDecode {
-                    Section("JWT") {
-                        Button(appendSparkleIf("Decode Payload", condition: clipboardAnalysis.dataType == .jwt && !shouldShowAll)) {
-                            transformClipboardIfValid(ClipboardTransform.jwtDecode)
-                        }
-                        Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
-                    }
-                }
-                Divider()
-                Section("Calculate Checksum") {
-                    Button("MD5") { transformClipboard(ClipboardTransform.md5Checksum) }
-                    Button("SHA-1") { transformClipboard(ClipboardTransform.sha1Checksum) }
-                    Button("SHA-256") { transformClipboard(ClipboardTransform.sha256Checksum) }
-                    Button("SHA-512") { transformClipboard(ClipboardTransform.sha512Checksum) }
-                    Button("CRC32") { transformClipboard(ClipboardTransform.crc32) }
-                }
-                Divider()
-                Section("Hash Credentials") {
-                    Button("Argon2id") { transformClipboardIfValid(ClipboardTransform.argon2idHash) }
-                    Button("bcrypt") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
-                }
-            }
+
             Menu("Multi-line") {
                 if clipboardAnalysis.lineCount > 1 || shouldShowAll {
                     Menu("Sort Lines") {
@@ -837,6 +813,53 @@ struct MenuBarView: View {
                     Button(appendSparkleIf("CRLF → LF (strip \\r)", condition: hasCarriageReturns && !shouldShowAll)) {
                         transformClipboard(ClipboardTransform.windowsNewlinesToUnix)
                     }
+                }
+            }
+            Menu(encodeHashMenuLabel) {
+                Section("URL") {
+                    Button("Encode") { transformClipboard(ClipboardTransform.urlEncode) }
+                    if showURLDecode {
+                        Button(appendSparkleIf("Decode", condition: isPossiblyURLEncoded && !shouldShowAll)) {
+                            transformClipboard(ClipboardTransform.urlDecode)
+                        }
+                    }
+                }
+                Section("Base64") {
+                    Button("Encode") { transformClipboard(ClipboardTransform.base64Encode) }
+                    if showBase64Decode {
+                        Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64 && !shouldShowAll)) {
+                            transformClipboard(ClipboardTransform.base64Decode)
+                        }
+                    }
+                }
+                Section("Base64 URL-Safe") {
+                    Button("Encode") { transformClipboard(ClipboardTransform.base64URLEncode) }
+                    if showBase64URLDecode {
+                        Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64URL && !shouldShowAll)) {
+                            transformClipboard(ClipboardTransform.base64URLDecode)
+                        }
+                    }
+                }
+                if showJWTDecode {
+                    Section("JWT") {
+                        Button(appendSparkleIf("Decode Payload", condition: clipboardAnalysis.dataType == .jwt && !shouldShowAll)) {
+                            transformClipboardIfValid(ClipboardTransform.jwtDecode)
+                        }
+                        Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
+                    }
+                }
+                Divider()
+                Section("Calculate Checksum") {
+                    Button("MD5") { transformClipboard(ClipboardTransform.md5Checksum) }
+                    Button("SHA-1") { transformClipboard(ClipboardTransform.sha1Checksum) }
+                    Button("SHA-256") { transformClipboard(ClipboardTransform.sha256Checksum) }
+                    Button("SHA-512") { transformClipboard(ClipboardTransform.sha512Checksum) }
+                    Button("CRC32") { transformClipboard(ClipboardTransform.crc32) }
+                }
+                Divider()
+                Section("Hash Credentials") {
+                    Button("Argon2id") { transformClipboardIfValid(ClipboardTransform.argon2idHash) }
+                    Button("bcrypt") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
                 }
             }
             if showJSONYAMLMenu {
@@ -1045,7 +1068,7 @@ struct MenuBarView: View {
             }
         }
         }
-        Menu("Set Clipboard Data") {
+        Menu("Set Clipboard Text") {
             Menu("Time") {
                 Section("Sets Clipboard to Current Time") {
                     Divider()
@@ -1221,27 +1244,19 @@ struct MenuBarView: View {
         if displayedSnippets.isEmpty {
             Text("No snippets yet")
         } else {
-            ForEach(displayedSnippets) { snippet in
-                Menu(snippetMenuTitle(for: snippet)) {
-                    Button("Copy to Clipboard") { copyToClipboard(snippet) }
-                    if hasURL(snippet.body) {
-                        Button("Open URL") { openURL(from: snippet.body) }
+            ForEach(recentDisplayedSnippets) { snippet in
+                snippetMenu(snippet)
+            }
+            let limit = min(
+                max(recentSnippetsMenuCount, Self.recentSnippetsMenuCountRange.lowerBound),
+                Self.recentSnippetsMenuCountRange.upperBound
+            )
+            if displayedSnippets.count > limit {
+                Divider()
+                Menu("All Snippets") {
+                    ForEach(displayedSnippets) { snippet in
+                        snippetMenu(snippet)
                     }
-                    Button("Edit") {
-                        editorStore.editingSnippet = snippet
-                        openWindow(id: "editor")
-                        DispatchQueue.main.async {
-                            NSApp.activate(ignoringOtherApps: true)
-                        }
-                    }
-                    Button(role: .destructive) { confirmAndDelete(snippet) } label: {
-                        Text("Delete")
-                    }
-                    Divider()
-                    Button("Move Up") { moveUp(snippet) }
-                        .disabled(useDemoSnippets || displayedSnippets.first?.id == snippet.id)
-                    Button("Move Down") { moveDown(snippet) }
-                        .disabled(useDemoSnippets || displayedSnippets.last?.id == snippet.id)
                 }
             }
         }
@@ -1259,6 +1274,20 @@ struct MenuBarView: View {
             }
         } label: {
             Label("Settings…", systemImage: "gearshape")
+        }
+        Button {
+            openWindow(id: "tips-clipboard-envy")
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "tips-clipboard-envy" }) {
+                    if w.isMiniaturized {
+                        w.deminiaturize(nil)
+                    }
+                    w.makeKeyAndOrderFront(nil)
+                }
+            }
+        } label: {
+            Label("Tips", systemImage: "lightbulb")
         }
         Button {
             openWindow(id: "about-clipboard-envy")
@@ -1290,6 +1319,40 @@ struct MenuBarView: View {
 
     // MARK: - Actions
 
+    private struct ClipboardMenuModifiers {
+        let shouldCopyBeforeTransform: Bool
+        let shouldPasteAfterOperation: Bool
+
+        init(flags: NSEvent.ModifierFlags) {
+            shouldCopyBeforeTransform = flags.contains(.option)
+            shouldPasteAfterOperation = flags.contains(.shift)
+        }
+    }
+
+    private func currentMenuModifiers() -> ClipboardMenuModifiers {
+        ClipboardMenuModifiers(flags: NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags)
+    }
+
+    private func sendPasteKeystroke() {
+        do {
+            try KeyboardShortcut.commandV()
+        } catch {
+            #if DEBUG
+            print("[KeyboardShortcut] Paste failed: \(error)")
+            #endif
+        }
+    }
+
+    private func sendCopyKeystroke() {
+        do {
+            try KeyboardShortcut.commandC()
+        } catch {
+            #if DEBUG
+            print("[KeyboardShortcut] Copy failed: \(error)")
+            #endif
+        }
+    }
+
     private func quickSaveFromClipboard() {
         if let str = ClipboardIO.readString(), !str.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let snippet = Snippet(body: str, timestamp: Date())
@@ -1301,19 +1364,82 @@ struct MenuBarView: View {
         }
     }
 
-    private func transformClipboard(_ transform: (String) -> String) {
-        ClipboardTransform.apply(transform, muted: muteSounds)
+    private func transformClipboard(_ transform: @escaping (String) -> String) {
+        let modifiers = currentMenuModifiers()
+
+        if modifiers.shouldCopyBeforeTransform {
+            sendCopyKeystroke()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                let ok = ClipboardTransform.apply(transform, muted: muteSounds)
+                refreshClipboardAnalysis()
+                if ok, modifiers.shouldPasteAfterOperation {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                        sendPasteKeystroke()
+                    }
+                }
+            }
+            return
+        }
+
+        let ok = ClipboardTransform.apply(transform, muted: muteSounds)
         refreshClipboardAnalysis()
+        if ok, modifiers.shouldPasteAfterOperation {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                sendPasteKeystroke()
+            }
+        }
     }
 
-    private func transformClipboardIfValid(_ transform: (String) -> String?) {
-        ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+    private func transformClipboardIfValid(_ transform: @escaping (String) -> String?) {
+        let modifiers = currentMenuModifiers()
+
+        if modifiers.shouldCopyBeforeTransform {
+            sendCopyKeystroke()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+                refreshClipboardAnalysis()
+                if ok, modifiers.shouldPasteAfterOperation {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                        sendPasteKeystroke()
+                    }
+                }
+            }
+            return
+        }
+
+        let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
         refreshClipboardAnalysis()
+        if ok, modifiers.shouldPasteAfterOperation {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                sendPasteKeystroke()
+            }
+        }
     }
 
-    private func transformClipboardIfValid(_ transform: (String) throws -> String) {
-        ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+    private func transformClipboardIfValid(_ transform: @escaping (String) throws -> String) {
+        let modifiers = currentMenuModifiers()
+
+        if modifiers.shouldCopyBeforeTransform {
+            sendCopyKeystroke()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+                refreshClipboardAnalysis()
+                if ok, modifiers.shouldPasteAfterOperation {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                        sendPasteKeystroke()
+                    }
+                }
+            }
+            return
+        }
+
+        let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
         refreshClipboardAnalysis()
+        if ok, modifiers.shouldPasteAfterOperation {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                sendPasteKeystroke()
+            }
+        }
     }
 
     private func refreshClipboardAnalysis() {
@@ -1420,107 +1546,107 @@ struct MenuBarView: View {
     }
 
     private func setClipboardToEpochSeconds() {
-        ClipboardSet.setAndNotify(ClipboardSet.epochSeconds(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.epochSeconds())
     }
     private func setClipboardToEpochMilliseconds() {
-        ClipboardSet.setAndNotify(ClipboardSet.epochMilliseconds(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.epochMilliseconds())
     }
     private func setClipboardToSQLDateTimeLocal() {
-        ClipboardSet.setAndNotify(ClipboardSet.sqlDateTimeLocal(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.sqlDateTimeLocal())
     }
     private func setClipboardToSQLDateTimeUTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.sqlDateTimeUTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.sqlDateTimeUTC())
     }
     private func setClipboardToRFC3339Z() {
-        ClipboardSet.setAndNotify(ClipboardSet.rfc3339Z(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.rfc3339Z())
     }
     private func setClipboardToRFC3339WithOffset() {
-        ClipboardSet.setAndNotify(ClipboardSet.rfc3339WithOffset(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.rfc3339WithOffset())
     }
     private func setClipboardToRFC3339WithAbbreviation() {
-        ClipboardSet.setAndNotify(ClipboardSet.rfc3339WithAbbreviation(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.rfc3339WithAbbreviation())
     }
     private func setClipboardToRFC1123Local() {
-        ClipboardSet.setAndNotify(ClipboardSet.rfc1123Local(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.rfc1123Local())
     }
     private func setClipboardToRFC1123UTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.rfc1123UTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.rfc1123UTC())
     }
     private func setClipboardToYYYYMMDDHHmmssLocal() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHmmssLocal(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyyyMMddHHmmssLocal())
     }
     private func setClipboardToYYYYMMDDHHmmssUTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHmmssUTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyyyMMddHHmmssUTC())
     }
     private func setClipboardToYYMMDDHHmmssLocal() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyMMddHHmmssLocal(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyMMddHHmmssLocal())
     }
     private func setClipboardToYYMMDDHHmmssUTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyMMddHHmmssUTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyMMddHHmmssUTC())
     }
     private func setClipboardToYYYYMMDDLocal() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddLocal(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyyyMMddLocal())
     }
     private func setClipboardToYYYYMMDDUTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddUTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyyyMMddUTC())
     }
     private func setClipboardToYYYYMMDDHHLocal() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHLocal(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyyyMMddHHLocal())
     }
     private func setClipboardToYYYYMMDDHHUTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyyyMMddHHUTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyyyMMddHHUTC())
     }
     private func setClipboardToYYMMDDLocal() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyMMddLocal(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyMMddLocal())
     }
     private func setClipboardToYYMMDDUTC() {
-        ClipboardSet.setAndNotify(ClipboardSet.yyMMddUTC(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.yyMMddUTC())
     }
     private func setClipboardToRandomUUID() {
-        ClipboardSet.setAndNotify(ClipboardSet.randomUUID(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.randomUUID())
     }
     private func setClipboardToRandomUUIDLowercase() {
-        ClipboardSet.setAndNotify(ClipboardSet.randomUUIDLowercase(), muted: muteSounds)
+        setClipboardTo(ClipboardSet.randomUUIDLowercase())
     }
 
     private func setClipboardToRandomHex(byteCount: Int) {
         if let s = ClipboardSet.randomHexString(byteCount: byteCount) {
-            ClipboardSet.setAndNotify(s, muted: muteSounds)
+            setClipboardTo(s)
         } else {
             ClipboardSound.playClipboardError(muted: muteSounds)
         }
     }
     private func setClipboardToRandomULID() {
         if let s = ClipboardSet.randomULID() {
-            ClipboardSet.setAndNotify(s, muted: muteSounds)
+            setClipboardTo(s)
         } else {
             ClipboardSound.playClipboardError(muted: muteSounds)
         }
     }
     private func setClipboardToRandomNanoID() {
         if let s = ClipboardSet.randomNanoID() {
-            ClipboardSet.setAndNotify(s, muted: muteSounds)
+            setClipboardTo(s)
         } else {
             ClipboardSound.playClipboardError(muted: muteSounds)
         }
     }
     private func setClipboardToRandomVeryComplexPassword() {
         if let s = ClipboardSet.randomVeryComplexPassword() {
-            ClipboardSet.setAndNotify(s, muted: muteSounds)
+            setClipboardTo(s)
         } else {
             ClipboardSound.playClipboardError(muted: muteSounds)
         }
     }
     private func setClipboardToRandomComplexPassword() {
         if let s = ClipboardSet.randomComplexPassword() {
-            ClipboardSet.setAndNotify(s, muted: muteSounds)
+            setClipboardTo(s)
         } else {
             ClipboardSound.playClipboardError(muted: muteSounds)
         }
     }
     private func setClipboardToRandomAlphanumericPassword() {
         if let s = ClipboardSet.randomAlphanumericPassword() {
-            ClipboardSet.setAndNotify(s, muted: muteSounds)
+            setClipboardTo(s)
         } else {
             ClipboardSound.playClipboardError(muted: muteSounds)
         }
@@ -1528,6 +1654,11 @@ struct MenuBarView: View {
 
     private func setClipboardTo(_ string: String) {
         ClipboardSet.setAndNotify(string, muted: muteSounds)
+        if currentMenuModifiers().shouldPasteAfterOperation {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                sendPasteKeystroke()
+            }
+        }
     }
 
     private func confirmAndDelete(_ snippet: Snippet) {
@@ -1558,6 +1689,11 @@ struct MenuBarView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(snippet.body, forType: .string)
         ClipboardSound.playClipboardWritten(muted: muteSounds)
+        if currentMenuModifiers().shouldPasteAfterOperation {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                sendPasteKeystroke()
+            }
+        }
     }
 
     private func moveUp(_ snippet: Snippet) {
@@ -1583,11 +1719,40 @@ struct MenuBarView: View {
         try? modelContext.save()
     }
 
-    private func snippetMenuTitle(for snippet: Snippet) -> String {
-        if let t = snippet.title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return truncated(normalizedForMenu(t), limit: 40)
+    @ViewBuilder
+    private func snippetMenu(_ snippet: Snippet) -> some View {
+        Menu(snippetMenuTitle(for: snippet)) {
+            Button("Copy to Clipboard") { copyToClipboard(snippet) }
+            if hasURL(snippet.body) {
+                Button("Open URL") { openURL(from: snippet.body) }
+            }
+            Button("Edit") {
+                editorStore.editingSnippet = snippet
+                openWindow(id: "editor")
+                DispatchQueue.main.async {
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+            Button(role: .destructive) { confirmAndDelete(snippet) } label: {
+                Text("Delete")
+            }
+            Divider()
+            Button("Move Up") { moveUp(snippet) }
+                .disabled(useDemoSnippets || displayedSnippets.first?.id == snippet.id)
+            Button("Move Down") { moveDown(snippet) }
+                .disabled(useDemoSnippets || displayedSnippets.last?.id == snippet.id)
         }
-        return truncated(normalizedForMenu(snippet.body), limit: 40)
+    }
+
+    private func snippetMenuTitle(for snippet: Snippet) -> String {
+        let limit = min(
+            max(snippetMenuLabelMaxChars, Self.snippetMenuLabelMaxCharsRange.lowerBound),
+            Self.snippetMenuLabelMaxCharsRange.upperBound
+        )
+        if let t = snippet.title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return truncated(normalizedForMenu(t), limit: limit)
+        }
+        return truncated(normalizedForMenu(snippet.body), limit: limit)
     }
 
     private func hasURL(_ text: String) -> Bool {

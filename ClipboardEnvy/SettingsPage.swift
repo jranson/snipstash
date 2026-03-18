@@ -30,6 +30,7 @@ private struct DictSectionConfig {
 }
 
 private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
+    case general      = "General"
     case soundEffects = "Sound Effects"
     case removeLines  = "Remove Lines Menu"
     case splitJoin    = "Split / Join Menus"
@@ -43,7 +44,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
-        case .soundEffects:      return "speaker"
+        case .general:      return "gearshape"
+        case .soundEffects: return "speaker"
         case .argon2:       return "lock.shield"
         case .removeLines:  return "list.number"
         case .splitJoin:    return "scissors"
@@ -312,7 +314,7 @@ private struct DiscreteVolumeSlider: NSViewRepresentable {
 struct SettingsClipboardEnvyView: View {
     private static let windowTitle = "\(BuildInfo.appName) Settings"
     @Environment(\.colorScheme) private var colorScheme
-    @State private var selectedSection: SettingsSection? = .soundEffects
+    @State private var selectedSection: SettingsSection? = .general
     @State private var escapeMonitor: Any? = nil
     
     private var selectedSectionBinding: Binding<SettingsSection?> {
@@ -399,6 +401,8 @@ struct SettingsClipboardEnvyView: View {
                                 )
                             } else {
                                 switch section {
+                                case .general:
+                                    GeneralSettingsView()
                                 case .soundEffects:
                                     SoundEffectsSettingsView()
                                 case .argon2:
@@ -465,6 +469,57 @@ struct SettingsClipboardEnvyView: View {
 }
 
 // MARK: - General Settings
+
+private struct GeneralSettingsView: View {
+    private static let recentSnippetsMenuCountRange: ClosedRange<Int> = 0...20
+    private static let snippetMenuLabelMaxCharsRange: ClosedRange<Int> = 10...64
+
+    @AppStorage("recentSnippetsMenuCount") private var recentSnippetsMenuCount = 10
+    @AppStorage("snippetMenuLabelMaxChars") private var snippetMenuLabelMaxChars = 36
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                SectionTitle(title: "General")
+
+                SettingsCard {
+                    VStack(spacing: 0) {
+                        Argon2Row(
+                            label: "Recent Snippets in Menu",
+                            description: "Number of recent snippets shown at the top-level. Default: 10",
+                            value: $recentSnippetsMenuCount,
+                            range: Self.recentSnippetsMenuCountRange,
+                            step: 1
+                        )
+                        Divider().padding(.leading, 16)
+                        Argon2Row(
+                            label: "Snippet Menu Label Max Length",
+                            description: "Max characters before truncation with an ellipsis. Default: 36",
+                            value: $snippetMenuLabelMaxChars,
+                            range: Self.snippetMenuLabelMaxCharsRange,
+                            step: 1
+                        )
+                    }
+                }
+            }
+            .padding(.top, 12)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onChange(of: recentSnippetsMenuCount) { _, v in
+            let clamped = min(max(v, Self.recentSnippetsMenuCountRange.lowerBound), Self.recentSnippetsMenuCountRange.upperBound)
+            if clamped != v {
+                recentSnippetsMenuCount = clamped
+            }
+        }
+        .onChange(of: snippetMenuLabelMaxChars) { _, v in
+            let clamped = min(max(v, Self.snippetMenuLabelMaxCharsRange.lowerBound), Self.snippetMenuLabelMaxCharsRange.upperBound)
+            if clamped != v {
+                snippetMenuLabelMaxChars = clamped
+            }
+        }
+    }
+}
 
 private struct SoundEffectsSettingsView: View {
     @AppStorage("muteQuickSaveSounds") private var muteSounds = false
