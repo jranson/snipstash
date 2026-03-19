@@ -171,6 +171,30 @@ private struct SettingsCard<Content: View>: View {
     }
 }
 
+// MARK: - Settings Panel (theme-specific bordered container)
+
+private struct SettingsPanel<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        colorScheme == .dark
+                            ? Color.black.opacity(0.3)
+                            : Color.black.opacity(0.05)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1)
+            )
+    }
+}
+
 // MARK: - Section Title Helper
 
 private struct SectionTitle: View {
@@ -253,15 +277,6 @@ private struct ClipboardSoundRow: View {
                     .frame(width: 30, alignment: .center)
             }
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1)
-        )
     }
 }
 
@@ -501,6 +516,20 @@ private struct GeneralSettingsView: View {
                         )
                     }
                 }
+
+                Spacer()
+                Spacer()
+                Spacer()
+                Spacer()
+                Spacer()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    tipRow(
+                        title: "Power User Tip  —  Auto-Copy & Auto-Paste",
+                        detail: "Try pressing ⌥ Option, ⇧ Shift, or ⌥ Option + ⇧ Shift while the \(BuildInfo.appName) menu is open for some cool power-ups!",
+                        bullet: "💡"
+                    )
+                }
             }
             .padding(.top, 12)
             .padding(.horizontal, 16)
@@ -518,6 +547,28 @@ private struct GeneralSettingsView: View {
                 snippetMenuLabelMaxChars = clamped
             }
         }
+    }
+
+    @ViewBuilder
+    private func tipRow(title: String, detail: String, bullet: String = "") -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(bullet.isEmpty ? title : "\(bullet) \(title)")
+                .font(.system(size: 14.5, weight: .semibold))
+            Text(detail)
+                .font(.system(size: 14.5))
+                .foregroundStyle(.secondary)
+                .lineSpacing(5)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(8)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .secondarySystemFill).opacity(0.25))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+        )
     }
 }
 
@@ -567,45 +618,52 @@ private struct SoundEffectsSettingsView: View {
 
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 16) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Mute Sound Effects")
-                                    .font(.system(size: 14))
-                                Text("Silence audio feedback on clipboard operations.")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
+                        SettingsPanel {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Mute Sound Effects")
+                                        .font(.system(size: 14))
+                                    Text("Silence audio feedback on clipboard operations.")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Toggle("", isOn: $muteSounds)
+                                    .toggleStyle(.switch)
+                                    .labelsHidden()
                             }
-                            Spacer()
-                            Toggle("", isOn: $muteSounds)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
                         }
 
-                        ClipboardSoundRow(
-                            title: "Clipboard Written Sound",
-                            selectedSoundID: $clipboardWrittenSound,
-                            volumeBinding: writtenVolumeBinding,
-                            volumeValue: clipboardWrittenVolume,
-                            options: soundOptions,
-                            onPlay: {
-                                Task { @MainActor in
-                                    ClipboardSound.playClipboardWritten(muted: muteSounds)
+                        SettingsPanel {
+                            ClipboardSoundRow(
+                                title: "Clipboard Written Sound",
+                                selectedSoundID: $clipboardWrittenSound,
+                                volumeBinding: writtenVolumeBinding,
+                                volumeValue: clipboardWrittenVolume,
+                                options: soundOptions,
+                                onPlay: {
+                                    Task { @MainActor in
+                                        ClipboardSound.playClipboardWritten(muted: muteSounds)
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
+                        .padding(.bottom, 12)
 
-                        ClipboardSoundRow(
-                            title: "Clipboard Error Sound",
-                            selectedSoundID: $clipboardErrorSound,
-                            volumeBinding: errorVolumeBinding,
-                            volumeValue: clipboardErrorVolume,
-                            options: soundOptions,
-                            onPlay: {
-                                Task { @MainActor in
-                                    ClipboardSound.playClipboardError(muted: muteSounds)
+                        SettingsPanel {
+                            ClipboardSoundRow(
+                                title: "Clipboard Error Sound",
+                                selectedSoundID: $clipboardErrorSound,
+                                volumeBinding: errorVolumeBinding,
+                                volumeValue: clipboardErrorVolume,
+                                options: soundOptions,
+                                onPlay: {
+                                    Task { @MainActor in
+                                        ClipboardSound.playClipboardError(muted: muteSounds)
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                     .padding(16)
                 }

@@ -51,7 +51,7 @@ Clipboard Envy does not collect, send, or share your data. Everything stays on y
 
 ## Requirements
 
-- macOS 14 or higher
+- macOS 15 or higher
 - Xcode (for building locally)
 
 ## Configuration

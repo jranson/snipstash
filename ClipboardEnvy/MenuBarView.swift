@@ -18,23 +18,40 @@ struct MenuBarView: View {
 
     @State private var clipboardAnalysis = ClipboardAnalysis(dataType: .nonText)
     @State private var shouldShowAll = false
+    @State private var shouldPasteAfterOperation = false
+    @State private var optionMonitors: [Any] = []
 
     private var snippets: [Snippet] { snippetsStore.snippets }
 
     // MARK: - Sparkle helpers
 
     private func appendSparkleIf(_ base: String, condition: Bool) -> String {
-        condition ? "\(base) ✨" : base
+        condition ? "\(base)\(TransformMenuTitles.sparkleSuffix)" : base
+    }
+
+    @ViewBuilder
+    private func toggleVisibility<Content: View>(_ isHidden: Bool, @ViewBuilder _ content: () -> Content) -> some View {
+        if isHidden {
+            content().modifier(HiddenModifier())
+        } else {
+            content()
+        }
+    }
+
+    private struct HiddenModifier: ViewModifier {
+        func body(content: Content) -> some View {
+            content.hidden()
+        }
     }
 
     // MARK: - Menu Visibility Computed Properties
 
-    private var showTimeMenu: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .time
+    private var timeMenuLabel: String {
+        timeMenuTitle(shouldShowAll: shouldShowAll)
     }
 
-    private var timeMenuLabel: String {
-        appendSparkleIf("Time", condition: !shouldShowAll && clipboardAnalysis.dataType == .time)
+    private func timeMenuTitle(shouldShowAll: Bool) -> String {
+        appendSparkleIf(TransformMenuTitles.time, condition: !shouldShowAll && clipboardAnalysis.dataType == .time)
     }
 
     private var showJWTDecode: Bool {
@@ -117,7 +134,11 @@ struct MenuBarView: View {
     }
 
     private var urlsMenuLabel: String {
-        appendSparkleIf("URLs", condition: !shouldShowAll && isURL)
+        urlsMenuTitle(shouldShowAll: shouldShowAll)
+    }
+
+    private func urlsMenuTitle(shouldShowAll: Bool) -> String {
+        appendSparkleIf(TransformMenuTitles.urls, condition: !shouldShowAll && isURL)
     }
 
     private var showURLExtractSection: Bool {
@@ -152,10 +173,6 @@ struct MenuBarView: View {
         shouldShowAll || clipboardAnalysis.urlHasFragment
     }
 
-    private var showJSONYAMLMenu: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .json || clipboardAnalysis.dataType == .yaml
-    }
-
     private var showJSONYAMLPrettify: Bool {
         shouldShowAll || clipboardAnalysis.isMinified
     }
@@ -165,54 +182,64 @@ struct MenuBarView: View {
     }
 
     private var showJSONArrayToCsv: Bool {
-        // When showing all items (Option held), always offer Array → CSV for arrays.
-        if shouldShowAll {
-            return clipboardAnalysis.isArrayStructure
-        }
         // For normal mode, hide CSV transforms for simple literal arrays like
         // ["Commas", "Spaces", ...].
-        if isSimpleLiteralJsonArray {
-            return false
-        }
-        return clipboardAnalysis.isArrayStructure
+        shouldShowAll || (clipboardAnalysis.isArrayStructure && !isSimpleLiteralJsonArray)
+    }
+
+    private var generalTextMenuLabel: String {
+        generalTextMenuTitle(shouldShowAll: shouldShowAll)
+    }
+
+    private func generalTextMenuTitle(shouldShowAll _: Bool) -> String {
+        appendSparkleIf(TransformMenuTitles.generalText, condition: isSimpleLiteralJsonArray || hasZeroWidthCharacters)
     }
 
     private var jsonYAMLMenuLabel: String {
-        if shouldShowAll { return "JSON / YAML" }
-        switch clipboardAnalysis.dataType {
-        case .json: return appendSparkleIf("JSON", condition: true)
-        case .yaml: return appendSparkleIf("YAML", condition: true)
-        default: return "JSON / YAML"
-        }
+        jsonYAMLMenuTitle(shouldShowAll: shouldShowAll)
     }
 
-    private var showJSONSection: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .json
-    }
+    private func jsonYAMLMenuTitle(shouldShowAll: Bool) -> String {
+        let contextTitle: String = {
+            switch clipboardAnalysis.dataType {
+            case .json: return TransformMenuTitles.json
+            case .yaml: return TransformMenuTitles.yaml
+            default: return TransformMenuTitles.jsonOrYaml
+            }
+        }()
+        let menuTitleBase = shouldShowAll ? TransformMenuTitles.jsonOrYaml : contextTitle
+        let shouldSparkle = clipboardAnalysis.dataType == .json || clipboardAnalysis.dataType == .yaml
 
-    private var showYAMLSection: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .yaml
-    }
-
-    private var showCSVMenu: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .csv || clipboardAnalysis.dataType == .tsv || clipboardAnalysis.dataType == .psv || clipboardAnalysis.dataType == .fixedWidthTable
+        return appendSparkleIf(menuTitleBase, condition: shouldSparkle)
     }
 
     private var csvMenuLabel: String {
-        if shouldShowAll { return "CSV" }
-        switch clipboardAnalysis.dataType {
-        case .fixedWidthTable:
-            if let tableName = clipboardAnalysis.tableTypeName {
-                return appendSparkleIf(tableName, condition: true)
-            }
-            return appendSparkleIf("Table", condition: true)
-        case .csv: return appendSparkleIf("CSV", condition: true)
-        case .tsv: return appendSparkleIf("TSV", condition: true)
-        case .psv: return appendSparkleIf("PSV", condition: true)
-        default: return "CSV"
-        }
+        csvMenuTitle(shouldShowAll)
     }
 
+    private func csvMenuTitle(_ shouldShowAll: Bool) -> String {
+        _ = shouldShowAll
+        let titleBase: String = {
+            switch clipboardAnalysis.dataType {
+            case .fixedWidthTable:
+                if let tableName = clipboardAnalysis.tableTypeName {
+                    return tableName
+                }
+                return "Table"
+            case .csv: return TransformMenuTitles.csv
+            case .tsv: return "TSV"
+            case .psv: return "PSV"
+            default: return TransformMenuTitles.csv
+            }
+        }()
+
+        let shouldSparkle = clipboardAnalysis.dataType == .csv
+            || clipboardAnalysis.dataType == .tsv
+            || clipboardAnalysis.dataType == .psv
+            || clipboardAnalysis.dataType == .fixedWidthTable
+
+        return appendSparkleIf(titleBase, condition: shouldSparkle)
+    }
     private var showCSVSection: Bool {
         shouldShowAll || clipboardAnalysis.dataType == .csv
     }
@@ -229,68 +256,177 @@ struct MenuBarView: View {
         shouldShowAll || clipboardAnalysis.dataType == .psv
     }
 
-    private var showMultilineMenu: Bool {
+    private var showJoinAndCRMenus: Bool {
         shouldShowAll || clipboardAnalysis.lineCount > 1
     }
 
-    private var generalTextMenuLabel: String {
-        appendSparkleIf("General Text", condition: isSimpleLiteralJsonArray || hasZeroWidthCharacters)
+    private var showMultiLineTransformMenus: Bool {
+        shouldShowAll || clipboardAnalysis.lineCount > 1
     }
-
-    // MARK: - Column Menu Properties
 
     @State private var csvColumnHeaders: [String] = []
 
-    private var showColumnsSection: Bool {
-        clipboardAnalysis.isDelimitedData && !csvColumnHeaders.isEmpty
+    private var showStripColumns: Bool {
+        shouldShowAll || (clipboardAnalysis.isDelimitedData && !csvColumnHeaders.isEmpty)
     }
 
-    private var showDatabaseCLIMenu: Bool {
-        shouldShowAll || clipboardAnalysis.dataType == .databaseCLITable
+    private var showColumnsSection: Bool {
+        !csvColumnHeaders.isEmpty
     }
 
     private var databaseCLIMenuLabel: String {
+        databaseCLIMenuTitle()
+    }
+
+    private var transformRootMenuLabel: String {
+        if shouldShowAll && shouldPasteAfterOperation {
+            return TransformMenuTitles.transformRootCopyPaste
+        }
+        if shouldShowAll {
+            return TransformMenuTitles.transformRootCopy
+        }
+        if shouldPasteAfterOperation {
+            return TransformMenuTitles.transformRootPaste
+        }
+        return TransformMenuTitles.transformRoot
+    }
+
+    private var setClipboardMenuLabel: String {
+        shouldPasteAfterOperation ? TransformMenuTitles.setRootPaste : TransformMenuTitles.setRoot
+    }
+
+    private func databaseCLIMenuTitle() -> String {
         appendSparkleIf(
-            "Database CLI",
-            condition: !shouldShowAll && clipboardAnalysis.dataType == .databaseCLITable
+            TransformMenuTitles.databaseCLI,
+            condition: clipboardAnalysis.dataType == .databaseCLITable
         )
     }
 
-    private var showMySQLSection: Bool {
-        shouldShowAll || clipboardAnalysis.databaseFormat == "MySQL CLI"
+    private func transformSubmenusVisibleWithoutOption() -> Set<String> {
+        var visible: Set<String> = []
+        if clipboardAnalysis.dataType == .time {
+            visible.insert(TransformMenuTitles.time)
+        }
+        if clipboardAnalysis.dataType == .url {
+            visible.insert(TransformMenuTitles.urls)
+        }
+        if clipboardAnalysis.dataType == .json || clipboardAnalysis.dataType == .yaml {
+            visible.insert(TransformMenuTitles.jsonOrYaml)
+        }
+        if clipboardAnalysis.dataType == .csv ||
+            clipboardAnalysis.dataType == .tsv ||
+            clipboardAnalysis.dataType == .psv ||
+            clipboardAnalysis.dataType == .fixedWidthTable {
+            visible.insert(TransformMenuTitles.csv)
+        }
+        if clipboardAnalysis.dataType == .databaseCLITable {
+            visible.insert(TransformMenuTitles.databaseCLI)
+        }
+        return visible
     }
 
-    private var showPsqlSection: Bool {
-        shouldShowAll || clipboardAnalysis.databaseFormat == "psql"
-    }
+    private func transformMenuLabelsContext() -> TransformMenuLabelsContext {
+        let managedLabels: [String: TransformMenuLabelVariant] = [
+            TransformMenuTitles.time: .init(
+                withoutOption: timeMenuTitle(shouldShowAll: false),
+                withOption: timeMenuTitle(shouldShowAll: true)
+            ),
+            TransformMenuTitles.urls: .init(
+                withoutOption: urlsMenuTitle(shouldShowAll: false),
+                withOption: urlsMenuTitle(shouldShowAll: true)
+            ),
+            TransformMenuTitles.jsonOrYaml: .init(
+                withoutOption: jsonYAMLMenuTitle(shouldShowAll: false),
+                withOption: jsonYAMLMenuTitle(shouldShowAll: true)
+            ),
+            TransformMenuTitles.csv: .init(
+                withoutOption: csvMenuTitle(false),
+                withOption: csvMenuTitle(true)
+            ),
+            TransformMenuTitles.databaseCLI: .init(
+                withoutOption: databaseCLIMenuTitle(),
+                withOption: databaseCLIMenuTitle()
+            )
+        ]
 
-    private var showSqlite3Section: Bool {
-        shouldShowAll || clipboardAnalysis.databaseFormat == "sqlite3"
+        return TransformMenuLabelsContext(
+            transformRootTitle: transformRootMenuLabel,
+            setRootTitle: setClipboardMenuLabel,
+            generalText: TransformMenuLabelVariant(
+                withoutOption: generalTextMenuTitle(shouldShowAll: false),
+                withOption: generalTextMenuTitle(shouldShowAll: true)
+            ),
+            managedSubmenus: managedLabels,
+            showGeneralTextSplitJSONArray: shouldShowAll || isSimpleLiteralJsonArray,
+            showGeneralTextZeroWidthRemove: shouldShowAll || isSimpleLiteralJsonArray || hasZeroWidthCharacters,
+            showsJSONSectionWithoutOption: clipboardAnalysis.dataType == .json,
+            showsYAMLSectionWithoutOption: clipboardAnalysis.dataType == .yaml,
+            hasJSONOrYAMLContext: clipboardAnalysis.dataType == .json || clipboardAnalysis.dataType == .yaml,
+            showJSONYAMLPrettify: showJSONYAMLPrettify,
+            showJSONYAMLMinify: showJSONYAMLMinify,
+            showTimeEpochSecondsTransform: showEpochSecondsTransform,
+            showTimeEpochMillisecondsTransform: showEpochMillisecondsTransform,
+            showTimeSQLDateTimeTransform: showSQLDateTimeTransform,
+            showTimeRFC3339Transform: showRFC3339Transform,
+            showTimeRFC1123Transform: showRFC1123Transform,
+            showTimeSlashDateTimeTransform: showSlashDateTimeTransform,
+            showURLExtractHostPort: showURLExtractHostPort,
+            showURLExtractPort: showURLExtractPort,
+            showURLExtractPath: showURLExtractPath,
+            showURLExtractQuery: showURLExtractQuery,
+            showURLExtractFragment: showURLExtractFragment,
+            showURLExtractUsername: showURLExtractUsername,
+            showURLExtractCredentials: showURLExtractCredentials,
+            showShowURLExtractSection: showURLExtractSection,
+            showURLStripParams: shouldShowAll || isUrlWithParams,
+            showURLDecode: showURLDecode,
+            showBase64Decode: showBase64Decode,
+            showBase64URLDecode: showBase64URLDecode,
+            showJWTDecode: showJWTDecode,
+            showMultiLineTransformMenus: showMultiLineTransformMenus,
+            showJoinAndCRMenus: showJoinAndCRMenus,
+            hasCarriageReturns: hasCarriageReturns,
+            isJsonArray: isJsonArray,
+            isArrayStructure: clipboardAnalysis.isArrayStructure,
+            isSimpleLiteralJsonArray: isSimpleLiteralJsonArray,
+            showJSONArrayToCsv: showJSONArrayToCsv,
+            showCSVSection: showCSVSection,
+            showTSVPSVSection: showTSVPSVSection,
+            showTSVToCsv: showTSVToCsv,
+            showPSVToCsv: showPSVToCsv,
+            showFixedWidthTableSection: shouldShowAll || clipboardAnalysis.dataType == .fixedWidthTable,
+            showStripColumns: showStripColumns,
+            showColumnsSection: showColumnsSection,
+            showsMySQLSectionWithoutOption: clipboardAnalysis.databaseFormat == "MySQL CLI",
+            showsPsqlSectionWithoutOption: clipboardAnalysis.databaseFormat == "psql",
+            showsSQLite3SectionWithoutOption: clipboardAnalysis.databaseFormat == "sqlite3",
+            hasDatabaseCLITableContext: clipboardAnalysis.dataType == .databaseCLITable
+        )
     }
 
     // Time format visibility - hide transform to same format
     private var showEpochSecondsTransform: Bool {
-        shouldShowAll || clipboardAnalysis.timeFormat != "Epoch Seconds"
+        clipboardAnalysis.timeFormat != "Epoch Seconds"
     }
 
     private var showEpochMillisecondsTransform: Bool {
-        shouldShowAll || clipboardAnalysis.timeFormat != "Epoch Milliseconds"
+        clipboardAnalysis.timeFormat != "Epoch Milliseconds"
     }
 
     private var showSQLDateTimeTransform: Bool {
-        shouldShowAll || clipboardAnalysis.timeFormat != "SQL DateTime"
+        clipboardAnalysis.timeFormat != "SQL DateTime"
     }
 
     private var showRFC3339Transform: Bool {
-        shouldShowAll || clipboardAnalysis.timeFormat != "RFC3339 / ISO8601"
+        clipboardAnalysis.timeFormat != "RFC3339 / ISO8601"
     }
 
     private var showRFC1123Transform: Bool {
-        shouldShowAll || clipboardAnalysis.timeFormat != "RFC1123"
+        clipboardAnalysis.timeFormat != "RFC1123"
     }
 
     private var showSlashDateTimeTransform: Bool {
-        shouldShowAll || clipboardAnalysis.timeFormat != "Slash DateTime"
+        clipboardAnalysis.timeFormat != "Slash DateTime"
     }
 
     /// When true in Debug builds, show demo snippets for screenshots.
@@ -341,6 +477,36 @@ struct MenuBarView: View {
     #endif
 
     var body: some View {
+        Button {
+            openWindow(id: "about-clipboard-envy")
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "about-clipboard-envy" }) {
+                    if w.isMiniaturized {
+                        w.deminiaturize(nil)
+                    }
+                    w.makeKeyAndOrderFront(nil)
+                }
+            }
+        } label: {
+            Label("About \(BuildInfo.appName)", systemImage: "info.circle")
+        }
+        Divider()
+        Button {
+            openWindow(id: "settings-clipboard-envy")
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "settings-clipboard-envy" }) {
+                    if w.isMiniaturized {
+                        w.deminiaturize(nil)
+                    }
+                    w.makeKeyAndOrderFront(nil)
+                }
+            }
+        } label: {
+            Label("Settings…", systemImage: "gearshape")
+        }
+        Divider()
         Menu("Clipboard Data Analysis") {
             ForEach(Array(clipboardAnalysis.displayItems.enumerated()), id: \.offset) { _, item in
                 if item.key == ClipboardAnalysis.dividerKey {
@@ -384,8 +550,8 @@ struct MenuBarView: View {
             }
         }
         if clipboardAnalysis.dataType != .nonText {
-            Menu("Transform Clipboard Text") {
-            Menu(generalTextMenuLabel) {
+            Menu(transformRootMenuLabel) {
+                Menu(generalTextMenuLabel) {
                 if isSimpleLiteralJsonArray {
                     Button("Split JSON Array ✨") {
                         transformClipboardIfValid { input in
@@ -533,144 +699,116 @@ struct MenuBarView: View {
                     }
                 }
             }
-            if showTimeMenu {
-                Menu(timeMenuLabel) {
-                    if showEpochSecondsTransform {
-                        Button("→ Epoch (s)") { transformClipboardIfValid(ClipboardTransform.timeToEpochSeconds) }
-                    }
-                    if showEpochMillisecondsTransform {
-                        Button("→ Epoch (ms)") { transformClipboardIfValid(ClipboardTransform.timeToEpochMilliseconds) }
-                    }
-                    if showSQLDateTimeTransform {
-                        Divider()
-                        Button("→ SQL DateTime (Local)") { transformClipboardIfValid(ClipboardTransform.timeToSQLDateTimeLocal) }
-                        Button("→ SQL DateTime (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToSQLDateTimeUTC) }
-                    }
-                    if showRFC3339Transform {
-                        Divider()
-                        Button("→ RFC3339 (Z)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339Z) }
-                        Button("→ RFC3339 (+offset)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339WithOffset) }
-                        Button("→ RFC3339 (tz abbrev)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339WithAbbreviation) }
-                    }
-                    if showRFC1123Transform {
-                        Divider()
-                        Button("→ RFC1123 (Local)") { transformClipboardIfValid(ClipboardTransform.timeToRFC1123Local) }
-                        Button("→ RFC1123 (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToRFC1123UTC) }
-                    }
-                    if showSlashDateTimeTransform {
-                        Divider()
-                        Button("→ YYYY/MM/DD hh:mm:ss (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHmmssLocal) }
-                        Button("→ YYYY/MM/DD hh:mm:ss (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHmmssUTC) }
-                        Button("→ YY/MM/DD hh:mm:ss (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDHHmmssLocal) }
-                        Button("→ YY/MM/DD hh:mm:ss (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDHHmmssUTC) }
-                        Divider()
-                        Button("→ YYYY/MM/DD (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDLocal) }
-                        Button("→ YYYY/MM/DD (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDUTC) }
-                        Button("→ YYYY/MM/DD/HH (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHLocal) }
-                        Button("→ YYYY/MM/DD/HH (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHUTC) }
-                        Button("→ YY/MM/DD (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDLocal) }
-                        Button("→ YY/MM/DD (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDUTC) }
-                    }
+            Menu(timeMenuLabel) {
+                toggleVisibility(!showEpochSecondsTransform) {
+                    Button("→ Epoch (s)") { transformClipboardIfValid(ClipboardTransform.timeToEpochSeconds) }
+                }
+                toggleVisibility(!showEpochMillisecondsTransform) {
+                    Button("→ Epoch (ms)") { transformClipboardIfValid(ClipboardTransform.timeToEpochMilliseconds) }
+                }
+                toggleVisibility(!showSQLDateTimeTransform) {
+                    Divider()
+                    Button("→ SQL DateTime (Local)") { transformClipboardIfValid(ClipboardTransform.timeToSQLDateTimeLocal) }
+                    Button("→ SQL DateTime (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToSQLDateTimeUTC) }
+                }
+                toggleVisibility(!showRFC3339Transform) {
+                    Divider()
+                    Button("→ RFC3339 (Z)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339Z) }
+                    Button("→ RFC3339 (+offset)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339WithOffset) }
+                    Button("→ RFC3339 (tz abbrev)") { transformClipboardIfValid(ClipboardTransform.timeToRFC3339WithAbbreviation) }
+                }
+                toggleVisibility(!showRFC1123Transform) {
+                    Divider()
+                    Button("→ RFC1123 (Local)") { transformClipboardIfValid(ClipboardTransform.timeToRFC1123Local) }
+                    Button("→ RFC1123 (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToRFC1123UTC) }
+                }
+                toggleVisibility(!showSlashDateTimeTransform) {
+                    Divider()
+                    Button("→ YYYY/MM/DD hh:mm:ss (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHmmssLocal) }
+                    Button("→ YYYY/MM/DD hh:mm:ss (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHmmssUTC) }
+                    Button("→ YY/MM/DD hh:mm:ss (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDHHmmssLocal) }
+                    Button("→ YY/MM/DD hh:mm:ss (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDHHmmssUTC) }
+                    Divider()
+                    Button("→ YYYY/MM/DD (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDLocal) }
+                    Button("→ YYYY/MM/DD (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDUTC) }
+                    Button("→ YYYY/MM/DD/HH (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHLocal) }
+                    Button("→ YYYY/MM/DD/HH (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYYYMMDDHHUTC) }
+                    Button("→ YY/MM/DD (Local)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDLocal) }
+                    Button("→ YY/MM/DD (UTC)") { transformClipboardIfValid(ClipboardTransform.timeToYYMMDDUTC) }
                 }
             }
-            if showURLExtractSection {
-                Menu(urlsMenuLabel) {
-                    Section("Extract") {
-                        Button("Host (Domain)") { transformClipboardIfValid(ClipboardTransform.urlExtractHostIfValid) }
-                        if showURLExtractHostPort {
-                            Button("Host:Port") { transformClipboardIfValid(ClipboardTransform.urlExtractHostPortIfValid) }
-                        }
-                        if showURLExtractPort {
-                            Button("Port") { transformClipboardIfValid(ClipboardTransform.urlExtractPortIfValid) }
-                        }
-                        if showURLExtractPath {
-                            Button("Path") { transformClipboardIfValid(ClipboardTransform.urlExtractPathIfValid) }
-                        }
-                        if showURLExtractQuery {
-                            Button("Params") { transformClipboardIfValid(ClipboardTransform.urlExtractQueryIfValid) }
-                        }
-                        if showURLExtractFragment {
-                            Button("Hash") { transformClipboardIfValid(ClipboardTransform.urlExtractFragmentIfValid) }
-                        }
-                        if showURLExtractUsername {
-                            Button("Username") { transformClipboardIfValid(ClipboardTransform.urlExtractUsernameIfValid) }
-                        }
-                        if showURLExtractCredentials {
-                            Button("Username:Password") { transformClipboardIfValid(ClipboardTransform.urlExtractCredentialsIfValid) }
-                        }
-                    }
-                    if showURLExtractSection && (showURLExtractUsername || showURLExtractQuery) {
-                        Divider()
-                    }
-                    if showURLExtractUsername {
-                        Button(showURLExtractCredentials ? "Strip user:pass" : "Strip user") {
-                            transformClipboardIfValid(ClipboardTransform.urlStripCredentialsIfValid)
-                        }
-                    }
-                    if showURLExtractQuery {
-                        Button(isUrlWithParams && !shouldShowAll ? "Strip URL Params ✨" : "Strip URL Params") {
-                            transformClipboardIfValid(ClipboardTransform.stripUrlParamsIfValid)
-                        }
-                    }
+            Menu(urlsMenuLabel) {
+                Section("Extract") {
+                    Button("Host (Domain)") { transformClipboardIfValid(ClipboardTransform.urlExtractHostIfValid) }
+                    Button("Host:Port") { transformClipboardIfValid(ClipboardTransform.urlExtractHostPortIfValid) }
+                    Button("Port") { transformClipboardIfValid(ClipboardTransform.urlExtractPortIfValid) }
+                    Button("Path") { transformClipboardIfValid(ClipboardTransform.urlExtractPathIfValid) }
+                    Button("Params") { transformClipboardIfValid(ClipboardTransform.urlExtractQueryIfValid) }
+                    Button("Hash") { transformClipboardIfValid(ClipboardTransform.urlExtractFragmentIfValid) }
+                    Button("Username") { transformClipboardIfValid(ClipboardTransform.urlExtractUsernameIfValid) }
+                    Button("Username:Password") { transformClipboardIfValid(ClipboardTransform.urlExtractCredentialsIfValid) }
+                }
+                Divider()
+                Button(showURLExtractCredentials ? "Strip user:pass" : "Strip user") {
+                    transformClipboardIfValid(ClipboardTransform.urlStripCredentialsIfValid)
+                }
+                Button(isUrlWithParams ? "Strip URL Params ✨" : "Strip URL Params") {
+                    transformClipboardIfValid(ClipboardTransform.stripUrlParamsIfValid)
                 }
             }
 
             Menu("Multi-line") {
-                if clipboardAnalysis.lineCount > 1 || shouldShowAll {
-                    Menu("Sort Lines") {
-                        Button("Reverse Order") { transformClipboard(ClipboardTransform.reverseLines) }
-                        Button("Alphabetically") { transformClipboard(ClipboardTransform.sortLines) }
-                        Button("By Frequency ↑") { transformClipboard(ClipboardTransform.sortLinesByFrequencyAscending) }
-                        Button("By Frequency ↓") { transformClipboard(ClipboardTransform.sortLinesByFrequencyDescending) }
-                        Button("Shuffle") { transformClipboard(ClipboardTransform.shuffleLines) }
-                    }
-                    Divider()
-                    Menu("Collapse Lines") {
-                        Button("Deduplicate") { transformClipboard(ClipboardTransform.deduplicateLines) }
-                        Button("Dedupe + Alpha Sort") { transformClipboard(ClipboardTransform.sortAndDeduplicateLines) }
-                        Button("Drop Empty") { transformClipboard(ClipboardTransform.removeEmptyLines) }
-                        Button("Drop Unique") { transformClipboard(ClipboardTransform.removeUniqueLines) }
-                        Button("Drop Unique + Dedupe") { transformClipboard(ClipboardTransform.keepDuplicateLinesCollapsed) }
-                        Button("Drop Non-unique") { transformClipboard(ClipboardTransform.keepUniqueLines) }
-                    }
-                    Menu("Remove Lines") {
-                        let counts = ClipboardTransform.multilineRemoveValues()
-                        ForEach(counts, id: \.self) { n in
-                            let label = "First \(n)"
-                            Button(label) {
-                                transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
-                            }
-                        }
-                        Divider()
-                        ForEach(counts, id: \.self) { n in
-                            let label = "Last \(n)"
-                            Button(label) {
-                                transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
-                            }
-                        }
-                    }
-
-                    Menu("Head Lines") {
-                        let counts = ClipboardTransform.multilineRemoveValues()
-                        ForEach(counts, id: \.self) { n in
-                            let label = "\(n)"
-                            Button(label) {
-                                transformClipboard { ClipboardTransform.headLines($0, count: n) }
-                            }
-                        }
-                    }
-
-                    Menu("Tail Lines") {
-                        let counts = ClipboardTransform.multilineRemoveValues()
-                        ForEach(counts, id: \.self) { n in
-                            let label = "\(n)"
-                            Button(label) {
-                                transformClipboard { ClipboardTransform.tailLines($0, count: n) }
-                            }
-                        }
-                    }
-                    Divider()
+                Menu("Sort Lines") {
+                    Button("Reverse Order") { transformClipboard(ClipboardTransform.reverseLines) }
+                    Button("Alphabetically") { transformClipboard(ClipboardTransform.sortLines) }
+                    Button("By Frequency ↑") { transformClipboard(ClipboardTransform.sortLinesByFrequencyAscending) }
+                    Button("By Frequency ↓") { transformClipboard(ClipboardTransform.sortLinesByFrequencyDescending) }
+                    Button("Shuffle") { transformClipboard(ClipboardTransform.shuffleLines) }
                 }
+                Divider()
+                Menu("Collapse Lines") {
+                    Button("Deduplicate") { transformClipboard(ClipboardTransform.deduplicateLines) }
+                    Button("Dedupe + Alpha Sort") { transformClipboard(ClipboardTransform.sortAndDeduplicateLines) }
+                    Button("Drop Empty") { transformClipboard(ClipboardTransform.removeEmptyLines) }
+                    Button("Drop Unique") { transformClipboard(ClipboardTransform.removeUniqueLines) }
+                    Button("Drop Unique + Dedupe") { transformClipboard(ClipboardTransform.keepDuplicateLinesCollapsed) }
+                    Button("Drop Non-unique") { transformClipboard(ClipboardTransform.keepUniqueLines) }
+                }
+                Menu("Remove Lines") {
+                    let counts = ClipboardTransform.multilineRemoveValues()
+                    ForEach(counts, id: \.self) { n in
+                        let label = "First \(n)"
+                        Button(label) {
+                            transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
+                        }
+                    }
+                    Divider()
+                    ForEach(counts, id: \.self) { n in
+                        let label = "Last \(n)"
+                        Button(label) {
+                            transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
+                        }
+                    }
+                }
+                Menu("Head Lines") {
+                    let counts = ClipboardTransform.multilineRemoveValues()
+                    ForEach(counts, id: \.self) { n in
+                        let label = "\(n)"
+                        Button(label) {
+                            transformClipboard { ClipboardTransform.headLines($0, count: n) }
+                        }
+                    }
+                }
+                Menu("Tail Lines") {
+                    let counts = ClipboardTransform.multilineRemoveValues()
+                    ForEach(counts, id: \.self) { n in
+                        let label = "\(n)"
+                        Button(label) {
+                            transformClipboard { ClipboardTransform.tailLines($0, count: n) }
+                        }
+                    }
+                }
+                Divider()
 
                 Menu("Indent Lines") {
                     Section("Indent") {
@@ -756,37 +894,35 @@ struct MenuBarView: View {
                     Button("Trailing Semicolons") { transformClipboard(ClipboardTransform.trimTrailingSemicolons) }
                 }
                 Divider()
-                if clipboardAnalysis.lineCount > 1 || shouldShowAll {
-                    Menu("Join Lines") {
-                        Section("Join With") {
-                            ForEach(ClipboardTransform.builtinMultilineJoiners(), id: \.label) { item in
+                Menu("Join Lines") {
+                    Section("Join With") {
+                        ForEach(ClipboardTransform.builtinMultilineJoiners(), id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard { ClipboardTransform.joinLines($0, delimiter: item.delimiter) }
+                            }
+                        }
+                        let custom = ClipboardTransform.customMultilineJoiners()
+                        if !custom.isEmpty {
+                            Divider()
+                            ForEach(custom, id: \.label) { item in
                                 Button(item.label) {
                                     transformClipboard { ClipboardTransform.joinLines($0, delimiter: item.delimiter) }
                                 }
                             }
-                            let custom = ClipboardTransform.customMultilineJoiners()
-                            if !custom.isEmpty {
-                                Divider()
-                                ForEach(custom, id: \.label) { item in
-                                    Button(item.label) {
-                                        transformClipboard { ClipboardTransform.joinLines($0, delimiter: item.delimiter) }
-                                    }
-                                }
-                            }
                         }
-                        Divider()
-                        Button("→ JSON Array (typed)") {
-                            transformClipboardIfValid { input in
-                                ClipboardTransform.linesToTypedJsonArray(input)
-                            }
-                        }
-                        Button("→ JSON Array (strings)") {
-                            transformClipboardIfValid { input in
-                                ClipboardTransform.linesToStringJsonArray(input)
-                            }
-                        }
-                        Divider()
                     }
+                    Divider()
+                    Button("→ JSON Array (typed)") {
+                        transformClipboardIfValid { input in
+                            ClipboardTransform.linesToTypedJsonArray(input)
+                        }
+                    }
+                    Button("→ JSON Array (strings)") {
+                        transformClipboardIfValid { input in
+                            ClipboardTransform.linesToStringJsonArray(input)
+                        }
+                    }
+                    Divider()
                 }
 
                 Menu("Awk Lines") {
@@ -808,45 +944,166 @@ struct MenuBarView: View {
                     }
                 }
 
-                if hasCarriageReturns || shouldShowAll {
-                    Divider()
-                    Button(appendSparkleIf("CRLF → LF (strip \\r)", condition: hasCarriageReturns && !shouldShowAll)) {
-                        transformClipboard(ClipboardTransform.windowsNewlinesToUnix)
+                Divider()
+                Button(appendSparkleIf("CRLF → LF (strip \\r)", condition: hasCarriageReturns)) {
+                    transformClipboard(ClipboardTransform.windowsNewlinesToUnix)
+                }
+            }
+            Menu(jsonYAMLMenuLabel) {
+                Section(TransformMenuTitles.Section.json.rawValue) {
+                    Button("Prettify") { transformClipboard(ClipboardTransform.jsonPrettify) }
+                    Button("Minify") { transformClipboard(ClipboardTransform.jsonMinify) }
+                    Button("Sort Keys") { transformClipboard(ClipboardTransform.jsonSortKeys) }
+                    Button("Strip Nulls") { transformClipboard(ClipboardTransform.jsonStripNulls) }
+                    Button("Strip Empty Strings") { transformClipboard(ClipboardTransform.jsonStripEmptyStrings) }
+                    Button("Top-Level Keys") { transformClipboard(ClipboardTransform.jsonTopLevelKeys) }
+                    Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
+                    Button(appendSparkleIf("Array → CSV", condition: isJsonArray && !shouldShowAll)) {
+                        transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv)
                     }
+                    Button("→ YAML") { transformClipboardIfValid(ClipboardTransform.jsonToYaml) }
+                }
+                Section(TransformMenuTitles.Section.yaml.rawValue) {
+                    Button("Prettify") { transformClipboard(ClipboardTransform.yamlPrettify) }
+                    Button("Minify") { transformClipboard(ClipboardTransform.yamlMinify) }
+                    Button("→ JSON") { transformClipboardIfValid(ClipboardTransform.yamlToJson) }
+                }
+            }
+            Menu(csvMenuLabel) {
+                Section("CSV") {
+                    Button("→ JSON (typed)") { transformClipboardIfValid(ClipboardTransform.csvToJson) }
+                    Button("→ JSON (strings)") { transformClipboardIfValid(ClipboardTransform.csvToJsonStrings) }
+                    Button("→ Tab-separated") { transformClipboard(ClipboardTransform.csvToTsv) }
+                    Button("→ Pipe-separated") { transformClipboard(ClipboardTransform.csvToPsv) }
+                    Button("→ Fixed-Width Table") { transformClipboardIfValid(ClipboardTransform.csvToFixedWidthTable) }
+                }
+                Divider()
+                Section("Tab/Pipe-Separated") {
+                    Button("TSV → CSV") { transformClipboardIfValid(ClipboardTransform.tsvToCsv) }
+                    Button("PSV → CSV") { transformClipboardIfValid(ClipboardTransform.psvToCsv) }
+                }
+                Divider()
+                Section("Fixed-Width Table") {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToCsv) }
+                    Button("Table → JSON (typed)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJson) }
+                    Button("Table → JSON (strings)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJsonStrings) }
+                }
+                toggleVisibility(!showStripColumns) {
+                    Divider()
+                    Button("Strip Empty Columns") { stripEmptyColumns() }
+                }
+                toggleVisibility(!showColumnsSection) {
+                    Divider()
+                    Section("Columns") {
+                        ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { columnIndex, columnName in
+                            Menu(columnName.isEmpty ? "Column \(columnIndex + 1)" : columnName) {
+                                // Sort button
+                                Button("Sort By") {
+                                    sortByColumn(columnIndex: columnIndex)
+                                }
+                                Divider()
+                                // Remove button
+                                Button("Remove") {
+                                    removeColumn(columnIndex: columnIndex)
+                                }
+                                .disabled(csvColumnHeaders.count <= 1)
+                                // Extract submenu
+                                Divider()
+                                Menu("Extract") {
+                                    Button("This Column") {
+                                        extractColumns(fromIndex: columnIndex, toIndex: columnIndex)
+                                    }
+                                    let columnsAfter = Array(csvColumnHeaders.enumerated().dropFirst(columnIndex + 1).prefix(25))
+                                    if !columnsAfter.isEmpty {
+                                        Divider()
+                                        Section("Through") {
+                                            ForEach(columnsAfter, id: \.offset) { targetIndex, targetName in
+                                                Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
+                                                    extractColumns(fromIndex: columnIndex, toIndex: targetIndex)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                // Swap submenu
+                                Menu("Swap") {
+                                    ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { targetIndex, targetName in
+                                        if targetIndex != columnIndex {
+                                            Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
+                                                swapColumns(indexA: columnIndex, indexB: targetIndex)
+                                            }
+                                        }
+                                    }
+                                }
+                                // Move submenu
+                                Menu("Move") {
+                                    Button("To the Start") {
+                                        moveColumnToStart(fromIndex: columnIndex)
+                                    }
+                                    .disabled(columnIndex == 0)
+                                    Button("To the End") {
+                                        moveColumnToEnd(fromIndex: columnIndex)
+                                    }
+                                    .disabled(columnIndex == csvColumnHeaders.count - 1)
+                                    let validBeforeColumns = csvColumnHeaders.enumerated().filter { targetIndex, _ in
+                                        targetIndex != 0 &&
+                                        targetIndex != columnIndex &&
+                                        targetIndex != columnIndex + 1
+                                    }
+                                    if !validBeforeColumns.isEmpty {
+                                        Divider()
+                                        Section("Before") {
+                                            ForEach(Array(validBeforeColumns.prefix(26)), id: \.offset) { targetIndex, targetName in
+                                                Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
+                                                    moveColumnBefore(fromIndex: columnIndex, beforeIndex: targetIndex)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Menu(databaseCLIMenuLabel) {
+                Section(TransformMenuTitles.Section.mysql.rawValue) {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToCsv) }
+                    Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToJson) }
+                }
+                Section(TransformMenuTitles.Section.psql.rawValue) {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToCsv) }
+                    Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToJson) }
+                }
+                Section(TransformMenuTitles.Section.sqlite3.rawValue) {
+                    Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToCsv) }
+                    Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToJson) }
                 }
             }
             Menu(encodeHashMenuLabel) {
                 Section("URL") {
                     Button("Encode") { transformClipboard(ClipboardTransform.urlEncode) }
-                    if showURLDecode {
-                        Button(appendSparkleIf("Decode", condition: isPossiblyURLEncoded && !shouldShowAll)) {
-                            transformClipboard(ClipboardTransform.urlDecode)
-                        }
+                    Button(appendSparkleIf("Decode", condition: isPossiblyURLEncoded)) {
+                        transformClipboard(ClipboardTransform.urlDecode)
                     }
                 }
                 Section("Base64") {
                     Button("Encode") { transformClipboard(ClipboardTransform.base64Encode) }
-                    if showBase64Decode {
-                        Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64 && !shouldShowAll)) {
-                            transformClipboard(ClipboardTransform.base64Decode)
-                        }
+                    Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64)) {
+                        transformClipboard(ClipboardTransform.base64Decode)
                     }
                 }
                 Section("Base64 URL-Safe") {
                     Button("Encode") { transformClipboard(ClipboardTransform.base64URLEncode) }
-                    if showBase64URLDecode {
-                        Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64URL && !shouldShowAll)) {
-                            transformClipboard(ClipboardTransform.base64URLDecode)
-                        }
+                    Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64URL)) {
+                        transformClipboard(ClipboardTransform.base64URLDecode)
                     }
                 }
-                if showJWTDecode {
-                    Section("JWT") {
-                        Button(appendSparkleIf("Decode Payload", condition: clipboardAnalysis.dataType == .jwt && !shouldShowAll)) {
-                            transformClipboardIfValid(ClipboardTransform.jwtDecode)
-                        }
-                        Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
+                Section("JWT") {
+                    Button(appendSparkleIf("Decode Payload", condition: clipboardAnalysis.dataType == .jwt)) {
+                        transformClipboardIfValid(ClipboardTransform.jwtDecode)
                     }
+                    Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
                 }
                 Divider()
                 Section("Calculate Checksum") {
@@ -860,188 +1117,6 @@ struct MenuBarView: View {
                 Section("Hash Credentials") {
                     Button("Argon2id") { transformClipboardIfValid(ClipboardTransform.argon2idHash) }
                     Button("bcrypt") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
-                }
-            }
-            if showJSONYAMLMenu {
-                Menu(jsonYAMLMenuLabel) {
-                    if showJSONSection {
-                        Section("JSON") {
-                            if showJSONYAMLPrettify {
-                                Button("Prettify") { transformClipboard(ClipboardTransform.jsonPrettify) }
-                            }
-                            if showJSONYAMLMinify {
-                                Button("Minify") { transformClipboard(ClipboardTransform.jsonMinify) }
-                            }
-                            if shouldShowAll || !clipboardAnalysis.isArrayStructure {
-                                Button("Sort Keys") { transformClipboard(ClipboardTransform.jsonSortKeys) }
-                            }
-                            Button("Strip Nulls") { transformClipboard(ClipboardTransform.jsonStripNulls) }
-                            Button("Strip Empty Strings") { transformClipboard(ClipboardTransform.jsonStripEmptyStrings) }
-                            if shouldShowAll || !clipboardAnalysis.isArrayStructure {
-                                Button("Top-Level Keys") { transformClipboard(ClipboardTransform.jsonTopLevelKeys) }
-                            }
-                            if shouldShowAll || !isSimpleLiteralJsonArray {
-                                Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
-                            }
-                            if showJSONArrayToCsv {
-                                Button(appendSparkleIf("Array → CSV", condition: isJsonArray && !shouldShowAll)) {
-                                    transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv)
-                                }
-                            }
-                            Button("→ YAML") { transformClipboardIfValid(ClipboardTransform.jsonToYaml) }
-                        }
-                    }
-                    if showJSONSection && showYAMLSection {
-                        Divider()
-                    }
-                    if showYAMLSection {
-                        Section("YAML") {
-                            if showJSONYAMLPrettify {
-                                Button("Prettify") { transformClipboard(ClipboardTransform.yamlPrettify) }
-                            }
-                            if showJSONYAMLMinify {
-                                Button("Minify") { transformClipboard(ClipboardTransform.yamlMinify) }
-                            }
-                            Button("→ JSON") { transformClipboardIfValid(ClipboardTransform.yamlToJson) }
-                        }
-                    }
-                }
-            }
-            if showCSVMenu {
-                Menu(csvMenuLabel) {
-                    if showCSVSection {
-                        Section("CSV") {
-                            Button("→ JSON (typed)") { transformClipboardIfValid(ClipboardTransform.csvToJson) }
-                            Button("→ JSON (strings)") { transformClipboardIfValid(ClipboardTransform.csvToJsonStrings) }
-                            Button("→ Tab-separated") { transformClipboard(ClipboardTransform.csvToTsv) }
-                            Button("→ Pipe-separated") { transformClipboard(ClipboardTransform.csvToPsv) }
-                            Button("→ Fixed-Width Table") { transformClipboardIfValid(ClipboardTransform.csvToFixedWidthTable) }
-                        }
-                    }
-                    if showCSVSection && showTSVPSVSection {
-                        Divider()
-                    }
-                    if showTSVPSVSection {
-                        Section("Tab/Pipe-Separated") {
-                            if showTSVToCsv {
-                                Button("TSV → CSV") { transformClipboardIfValid(ClipboardTransform.tsvToCsv) }
-                            }
-                            if showPSVToCsv {
-                                Button("PSV → CSV") { transformClipboardIfValid(ClipboardTransform.psvToCsv) }
-                            }
-                        }
-                    }
-                    if clipboardAnalysis.dataType == .fixedWidthTable || shouldShowAll {
-                        Divider()
-                        Section("Fixed-Width Table") {
-                            Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToCsv) }
-                            Button("Table → JSON (typed)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJson) }
-                            Button("Table → JSON (strings)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJsonStrings) }
-                        }
-                    }
-                    if showColumnsSection {
-                        Divider()
-                        Button("Strip Empty Columns") { stripEmptyColumns() }
-                        Divider()
-                        Section("Columns") {
-                            ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { columnIndex, columnName in
-                                Menu(columnName.isEmpty ? "Column \(columnIndex + 1)" : columnName) {
-                                    // Sort button
-                                    Button("Sort By") {
-                                        sortByColumn(columnIndex: columnIndex)
-                                    }
-                                    Divider()
-                                    // Remove button
-                                    Button("Remove") {
-                                        removeColumn(columnIndex: columnIndex)
-                                    }
-                                    .disabled(csvColumnHeaders.count <= 1)
-                                    // Extract submenu
-                                    Divider()
-                                    Menu("Extract") {
-                                        Button("This Column") {
-                                            extractColumns(fromIndex: columnIndex, toIndex: columnIndex)
-                                        }
-                                        let columnsAfter = Array(csvColumnHeaders.enumerated().dropFirst(columnIndex + 1).prefix(25))
-                                        if !columnsAfter.isEmpty {
-                                            Divider()
-                                            Section("Through") {
-                                                ForEach(columnsAfter, id: \.offset) { targetIndex, targetName in
-                                                    Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
-                                                        extractColumns(fromIndex: columnIndex, toIndex: targetIndex)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // Swap submenu
-                                    Menu("Swap") {
-                                        ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { targetIndex, targetName in
-                                            if targetIndex != columnIndex {
-                                                Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
-                                                    swapColumns(indexA: columnIndex, indexB: targetIndex)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // Move submenu
-                                    Menu("Move") {
-                                        Button("To the Start") {
-                                            moveColumnToStart(fromIndex: columnIndex)
-                                        }
-                                        .disabled(columnIndex == 0)
-                                        Button("To the End") {
-                                            moveColumnToEnd(fromIndex: columnIndex)
-                                        }
-                                        .disabled(columnIndex == csvColumnHeaders.count - 1)
-                                        let validBeforeColumns = csvColumnHeaders.enumerated().filter { targetIndex, _ in
-                                            targetIndex != 0 &&
-                                            targetIndex != columnIndex &&
-                                            targetIndex != columnIndex + 1
-                                        }
-                                        if !validBeforeColumns.isEmpty {
-                                            Divider()
-                                            Section("Before") {
-                                                ForEach(Array(validBeforeColumns.prefix(26)), id: \.offset) { targetIndex, targetName in
-                                                    Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
-                                                        moveColumnBefore(fromIndex: columnIndex, beforeIndex: targetIndex)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if showDatabaseCLIMenu {
-                Menu(databaseCLIMenuLabel) {
-                    if showMySQLSection {
-                        Section("mysql") {
-                            Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToCsv) }
-                            Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.mysqlCliTableToJson) }
-                        }
-                    }
-                    if showMySQLSection && (showPsqlSection || showSqlite3Section) {
-                        Divider()
-                    }
-                    if showPsqlSection {
-                        Section("psql") {
-                            Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToCsv) }
-                            Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.psqlCliTableToJson) }
-                        }
-                    }
-                    if showPsqlSection && showSqlite3Section {
-                        Divider()
-                    }
-                    if showSqlite3Section {
-                        Section("sqlite3") {
-                            Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToCsv) }
-                            Button("Table → JSON") { transformClipboardIfValid(ClipboardTransform.sqlite3TableToJson) }
-                        }
-                    }
                 }
             }
             Menu("Escaping") {
@@ -1068,7 +1143,7 @@ struct MenuBarView: View {
             }
         }
         }
-        Menu("Set Clipboard Text") {
+        Menu(setClipboardMenuLabel) {
             Menu("Time") {
                 Section("Sets Clipboard to Current Time") {
                     Divider()
@@ -1102,6 +1177,21 @@ struct MenuBarView: View {
                     Button("Em dash —") { setClipboardTo("—") }
                     Button("En dash –") { setClipboardTo("–") }
                     Button("Ellipsis …") { setClipboardTo("…") }
+                }
+                Menu("Keyboard") {
+                    Button("Command ⌘") { setClipboardTo("⌘") }
+                    Button("Option ⌥") { setClipboardTo("⌥") }
+                    Button("Shift ⇧") { setClipboardTo("⇧") }
+                    Button("Return ⏎") { setClipboardTo("⏎") }
+                    Button("Control ⌃") { setClipboardTo("⌃") }
+                    Button("Caps Lock ⇪") { setClipboardTo("⇪") }
+                    Button("Tab ⇥") { setClipboardTo("⇥") }
+                    Divider()
+                    Button("Escape ⎋") { setClipboardTo("⎋") }
+                    Button("Backspace ⌫") { setClipboardTo("⌫") }
+                    Button("Delete ⌦") { setClipboardTo("⌦") }
+                    Button("Enter ⌅") { setClipboardTo("⌅") }
+                    Button("Clear ⌧") { setClipboardTo("⌧") }
                 }
                 Menu("Shapes") {
                     Button("Check mark ✓") { setClipboardTo("✓") }
@@ -1151,6 +1241,10 @@ struct MenuBarView: View {
                     Button("Left ←") { setClipboardTo("←") }
                     Button("Up ↑") { setClipboardTo("↑") }
                     Button("Down ↓") { setClipboardTo("↓") }
+                    Button("Upper-Left ↖") { setClipboardTo("↖") }
+                    Button("Upper-Right ↗") { setClipboardTo("↗") }
+                    Button("Lower-Left ↙") { setClipboardTo("↙") }
+                    Button("Lower-Right ↘") { setClipboardTo("↘") }
                     Button("Right double ⇒") { setClipboardTo("⇒") }
                     Button("Left double ⇐") { setClipboardTo("⇐") }
                 }
@@ -1205,30 +1299,28 @@ struct MenuBarView: View {
                 Button("Waltz, Bad Nymph") { setClipboardTo(ClipboardSet.waltzBadNymphPlaceholder) }
                 Button("Jackdaws") { setClipboardTo(ClipboardSet.jackdawsPlaceholder) }
             }
-            if shouldShowAll {
-                Divider()
-                Menu("Test Data") {
-                    Button("JSON Array") { setClipboardTo(TestData.jsonArray) }
-                    Button("JSON Object") { setClipboardTo(TestData.jsonObject) }
-                    Button("CSV") { setClipboardTo(TestData.csv) }
-                    Button("TSV") { setClipboardTo(TestData.tsv) }
-                    Button("PSV") { setClipboardTo(TestData.psv) }
-                    Button("YAML") { setClipboardTo(TestData.yaml) }
-                    Button("Fixed-Width (Docker ps)") { setClipboardTo(TestData.fixedWidthDockerContainers) }
-                    Button("Awkable Lines") { setClipboardTo(TestData.awkWhitespaceSample) }
-                    Button("Awkable Lines (slashes)") { setClipboardTo(TestData.awkDelimitedSample) }
-                    Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
-                    Button("JWT") { setClipboardTo(TestData.jwt) }
-                    Button("Base64") { setClipboardTo(ClipboardTransform.base64Encode(TestData.plainText)) }
-                    Button("Base64 URL") { setClipboardTo(ClipboardTransform.base64URLEncode(TestData.plainText)) }
-                    Button("URL-encoded") { setClipboardTo(TestData.urlEncoded) }
-                    Button("Plain text") { setClipboardTo(TestData.plainText) }
-                    Button("Text List (Instruments)") { setClipboardTo(TestData.instrumentsList) }
-                    Button("Text w/ 0-Width Chrs") { setClipboardTo(TestData.zeroWidthSample) }
-                    Button("MySQL CLI Table") { setClipboardTo(TestData.mysqlCLI) }
-                    Button("psql CLI Table") { setClipboardTo(TestData.psqlCLI) }
-                    Button("sqlite3 CLI Table") { setClipboardTo(TestData.sqlite3CLI) }
-                }
+            Divider()
+            Menu("Test Data") {
+                Button("JSON Array") { setClipboardTo(TestData.jsonArray) }
+                Button("JSON Object") { setClipboardTo(TestData.jsonObject) }
+                Button("CSV") { setClipboardTo(TestData.csv) }
+                Button("TSV") { setClipboardTo(TestData.tsv) }
+                Button("PSV") { setClipboardTo(TestData.psv) }
+                Button("YAML") { setClipboardTo(TestData.yaml) }
+                Button("Fixed-Width (Docker ps)") { setClipboardTo(TestData.fixedWidthDockerContainers) }
+                Button("Awkable Lines") { setClipboardTo(TestData.awkWhitespaceSample) }
+                Button("Awkable Lines (slashes)") { setClipboardTo(TestData.awkDelimitedSample) }
+                Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
+                Button("JWT") { setClipboardTo(TestData.jwt) }
+                Button("Base64") { setClipboardTo(ClipboardTransform.base64Encode(TestData.plainText)) }
+                Button("Base64 URL") { setClipboardTo(ClipboardTransform.base64URLEncode(TestData.plainText)) }
+                Button("URL-encoded") { setClipboardTo(TestData.urlEncoded) }
+                Button("Plain text") { setClipboardTo(TestData.plainText) }
+                Button("Text List (Instruments)") { setClipboardTo(TestData.instrumentsList) }
+                Button("Text w/ 0-Width Chrs") { setClipboardTo(TestData.zeroWidthSample) }
+                Button("MySQL CLI Table") { setClipboardTo(TestData.mysqlCLI) }
+                Button("psql CLI Table") { setClipboardTo(TestData.psqlCLI) }
+                Button("sqlite3 CLI Table") { setClipboardTo(TestData.sqlite3CLI) }
             }
         }
         Divider()
@@ -1262,48 +1354,6 @@ struct MenuBarView: View {
         }
         Divider()
         Button {
-            openWindow(id: "settings-clipboard-envy")
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "settings-clipboard-envy" }) {
-                    if w.isMiniaturized {
-                        w.deminiaturize(nil)
-                    }
-                    w.makeKeyAndOrderFront(nil)
-                }
-            }
-        } label: {
-            Label("Settings…", systemImage: "gearshape")
-        }
-        Button {
-            openWindow(id: "tips-clipboard-envy")
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "tips-clipboard-envy" }) {
-                    if w.isMiniaturized {
-                        w.deminiaturize(nil)
-                    }
-                    w.makeKeyAndOrderFront(nil)
-                }
-            }
-        } label: {
-            Label("Tips", systemImage: "lightbulb")
-        }
-        Button {
-            openWindow(id: "about-clipboard-envy")
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-                if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "about-clipboard-envy" }) {
-                    if w.isMiniaturized {
-                        w.deminiaturize(nil)
-                    }
-                    w.makeKeyAndOrderFront(nil)
-                }
-            }
-        } label: {
-            Label("About \(BuildInfo.appName)", systemImage: "info.circle")
-        }
-        Button {
             NSApp.terminate(nil)
         } label: {
             Label("Quit \(BuildInfo.appName)", systemImage: "xmark.circle")
@@ -1311,9 +1361,19 @@ struct MenuBarView: View {
         .onAppear {
             snippetsStore.refresh()
             refreshClipboardAnalysis()
+            startOptionMonitoring()
         }
         .onReceive(NotificationCenter.default.publisher(for: .clipboardEnvyMenuWillOpen)) { _ in
             refreshClipboardAnalysis()
+            MenuOpenBridge.setTransformMenuContext(transformSubmenusVisibleWithoutOption())
+            MenuOpenBridge.setTransformMenuLabelsContext(transformMenuLabelsContext())
+            if optionMonitors.isEmpty {
+                startOptionMonitoring()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .clipboardEnvyMenuDidClose)) { _ in
+            refreshOptionStatus()
+            stopOptionMonitoring()
         }
     }
 
@@ -1443,8 +1503,7 @@ struct MenuBarView: View {
     }
 
     private func refreshClipboardAnalysis() {
-        let modifiers = NSEvent.modifierFlags
-        shouldShowAll = modifiers.contains(.option)
+        refreshOptionStatus()
         let clipboardText = ClipboardIO.readString()
         clipboardAnalysis = ClipboardAnalyzer.analyze(clipboardText)
 
@@ -1453,6 +1512,48 @@ struct MenuBarView: View {
         } else {
             csvColumnHeaders = []
         }
+    }
+
+    private func refreshOptionStatus(modifiers: NSEvent.ModifierFlags = NSEvent.modifierFlags) {
+        let nextShouldShowAll = optionModifierIsPressed(modifierFlags: modifiers)
+        let nextShouldPasteAfterOperation = modifiers.contains(.shift)
+        if nextShouldShowAll != shouldShowAll || nextShouldPasteAfterOperation != shouldPasteAfterOperation {
+            print("[MenuBarView] refreshOptionStatus shouldShowAll=\(nextShouldShowAll) shouldPasteAfterOperation=\(nextShouldPasteAfterOperation)")
+            shouldShowAll = nextShouldShowAll
+            shouldPasteAfterOperation = nextShouldPasteAfterOperation
+            if let trackedMenu = MenuOpenBridge.currentTrackingMenuIfAvailable() {
+                MenuOpenBridge.setTransformMenuContext(transformSubmenusVisibleWithoutOption())
+                MenuOpenBridge.setTransformMenuLabelsContext(transformMenuLabelsContext())
+                MenuOpenBridge.applyTransformOverridesIfOpen(trackedMenu: trackedMenu, shouldShowAll: nextShouldShowAll)
+            }
+        }
+    }
+
+    private func optionModifierIsPressed(modifierFlags: NSEvent.ModifierFlags) -> Bool {
+        return modifierFlags.contains(.option)
+    }
+
+    private func startOptionMonitoring() {
+        stopOptionMonitoring()
+        let monitor = { (event: NSEvent) in
+            refreshOptionStatus(modifiers: event.modifierFlags)
+            return event
+        }
+        if let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: monitor) {
+            optionMonitors.append(localMonitor)
+        }
+        if let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: { event in
+            refreshOptionStatus(modifiers: event.modifierFlags)
+        }) {
+            optionMonitors.append(globalMonitor)
+        }
+    }
+
+    private func stopOptionMonitoring() {
+        for monitor in optionMonitors {
+            NSEvent.removeMonitor(monitor)
+        }
+        optionMonitors.removeAll()
     }
 
     // MARK: - Column Operations
@@ -1723,6 +1824,11 @@ struct MenuBarView: View {
     private func snippetMenu(_ snippet: Snippet) -> some View {
         Menu(snippetMenuTitle(for: snippet)) {
             Button("Copy to Clipboard") { copyToClipboard(snippet) }
+            .modifierKeyAlternate(.shift) {
+                Button("Copy to Clipboard & Paste (⌘V)") {
+                    copyToClipboard(snippet)
+                }
+            }
             if hasURL(snippet.body) {
                 Button("Open URL") { openURL(from: snippet.body) }
             }

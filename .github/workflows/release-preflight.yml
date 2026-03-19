@@ -6,7 +6,7 @@ on:
 jobs:
   preflight:
     if: github.repository_owner == 'centennial-oss' && github.ref_name == 'main'
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       APP_NAME: Clipboard Envy
       SCHEME_NAME: ClipboardEnvy

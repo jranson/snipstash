@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-test:
     if: github.repository_owner == 'centennial-oss'
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       APP_NAME: Clipboard Envy
       SCHEME_NAME: ClipboardEnvy

@@ -66,12 +66,6 @@ struct ClipboardEnvyApp: App {
         .defaultSize(width: 520, height: 540)
         .windowResizability(.contentSize)
 
-        Window("Tips \(BuildInfo.appName)", id: "tips-clipboard-envy") {
-            TipsClipboardEnvyView()
-        }
-        .defaultSize(width: 520, height: 540)
-        .windowResizability(.contentSize)
-
         Window("\(BuildInfo.appName) Settings", id: "settings-clipboard-envy") {
             SettingsClipboardEnvyView()
         }
