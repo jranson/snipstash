@@ -27,10 +27,6 @@ struct MenuBarView: View {
 
     // MARK: - Sparkle helpers
 
-    private func appendSparkleIf(_ base: String, condition: Bool) -> String {
-        condition ? "\(base)\(TransformMenuTitles.sparkleSuffix)" : base
-    }
-
     private func symbolMenuLabel(symbol: String, name: String, padding: String = "") -> String {
         "\(symbol)  \(padding)\(name)"
     }
@@ -57,7 +53,7 @@ struct MenuBarView: View {
     }
 
     private func timeMenuTitle(shouldShowAll: Bool) -> String {
-        appendSparkleIf(TransformMenuTitles.time, condition: !shouldShowAll && clipboardAnalysis.dataType == .time)
+        TransformMenuTitles.appendSparkleIf(TransformMenuTitles.time, condition: !shouldShowAll && clipboardAnalysis.dataType == .time)
     }
 
     private var showJWTDecode: Bool {
@@ -112,7 +108,7 @@ struct MenuBarView: View {
     // MARK: - Encode & Hash Menu
 
     private var encodeHashMenuLabel: String {
-        appendSparkleIf(
+        TransformMenuTitles.appendSparkleIf(
             "Encode / Hash",
             condition: !shouldShowAll && (
                 clipboardAnalysis.dataType == .jwt ||
@@ -134,7 +130,7 @@ struct MenuBarView: View {
     }
 
     private func urlsMenuTitle(shouldShowAll: Bool) -> String {
-        appendSparkleIf(TransformMenuTitles.urls, condition: !shouldShowAll && isURL)
+        TransformMenuTitles.appendSparkleIf(TransformMenuTitles.urls, condition: !shouldShowAll && isURL)
     }
 
     private var showURLExtractSection: Bool {
@@ -188,7 +184,7 @@ struct MenuBarView: View {
     }
 
     private func generalTextMenuTitle(shouldShowAll _: Bool) -> String {
-        appendSparkleIf(TransformMenuTitles.generalText, condition: isSimpleLiteralJsonArray || hasZeroWidthCharacters)
+        TransformMenuTitles.appendSparkleIf(TransformMenuTitles.generalText, condition: isSimpleLiteralJsonArray || hasZeroWidthCharacters)
     }
 
     private var jsonYAMLMenuLabel: String {
@@ -206,7 +202,7 @@ struct MenuBarView: View {
         let menuTitleBase = shouldShowAll ? TransformMenuTitles.jsonOrYaml : contextTitle
         let shouldSparkle = clipboardAnalysis.dataType == .json || clipboardAnalysis.dataType == .yaml
 
-        return appendSparkleIf(menuTitleBase, condition: shouldSparkle)
+        return TransformMenuTitles.appendSparkleIf(menuTitleBase, condition: shouldSparkle)
     }
 
     private var csvMenuLabel: String {
@@ -234,7 +230,7 @@ struct MenuBarView: View {
             || clipboardAnalysis.dataType == .psv
             || clipboardAnalysis.dataType == .fixedWidthTable
 
-        return appendSparkleIf(titleBase, condition: shouldSparkle)
+        return TransformMenuTitles.appendSparkleIf(titleBase, condition: shouldSparkle)
     }
     private var showCSVSection: Bool {
         shouldShowAll || clipboardAnalysis.dataType == .csv
@@ -292,7 +288,7 @@ struct MenuBarView: View {
     }
 
     private func databaseCLIMenuTitle() -> String {
-        appendSparkleIf(
+        TransformMenuTitles.appendSparkleIf(
             TransformMenuTitles.databaseCLI,
             condition: clipboardAnalysis.dataType == .databaseCLITable
         )
@@ -525,36 +521,37 @@ struct MenuBarView: View {
             Divider()
             
             if clipboardAnalysis.dataType == .jwt {
-                Button("Decode JWT Payload ✨") { transformClipboardIfValid(ClipboardTransform.jwtDecode) }
+                Button(TransformMenuTitles.appendSparkleIf("Decode JWT Payload", condition: true)) { transformClipboardIfValid(ClipboardTransform.jwtDecode) }
             }
             if clipboardAnalysis.dataType == .base64 {
-                Button("Decode Base64 ✨") { transformClipboard(ClipboardTransform.base64Decode) }
+                Button(TransformMenuTitles.appendSparkleIf("Decode Base64", condition: true)) { transformClipboard(ClipboardTransform.base64Decode) }
             }
             if clipboardAnalysis.dataType == .base64URL {
-                Button("Decode Base64 ✨") { transformClipboard(ClipboardTransform.base64URLDecode) }
+                Button(TransformMenuTitles.appendSparkleIf("Decode Base64", condition: true)) { transformClipboard(ClipboardTransform.base64URLDecode) }
             }
             if isUrlWithParams {
-                Button("Strip URL Params ✨") { transformClipboardIfValid(ClipboardTransform.stripUrlParamsIfValid) }
+                Button(TransformMenuTitles.appendSparkleIf("Strip URL Params", condition: true)) { transformClipboardIfValid(ClipboardTransform.stripUrlParamsIfValid) }
             }
             if hasCarriageReturns {
-                Button("CRLF → LF (strip \\r) ✨") { transformClipboard(ClipboardTransform.windowsNewlinesToUnix) }
+                Button(TransformMenuTitles.appendSparkleIf("CRLF → LF (strip \\r)", condition: true)) { transformClipboard(ClipboardTransform.windowsNewlinesToUnix) }
             }
             if hasZeroWidthCharacters {
-                Button(appendSparkleIf("Strip Zero-width Chars", condition: hasZeroWidthCharacters)) {
+                Button(TransformMenuTitles.appendSparkleIf("Strip Zero-width Chars", condition: true)) {
                     transformClipboard(ClipboardTransform.removeZeroWidthCharacters)
                 }
             }
             if isJsonArray && (!isSimpleLiteralJsonArray || shouldShowAll) {
-                Button("JSON Array → CSV ✨") { transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv) }
+                Button(TransformMenuTitles.appendSparkleIf("JSON Array → CSV", condition: true)) { transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv) }
             }
             if isSimpleLiteralJsonArray {
-                Button("Split JSON Array ✨") {
+                Button(TransformMenuTitles.appendSparkleIf("Split JSON Array", condition: true)) {
                     transformClipboardIfValid { input in
                         ClipboardTransform.simpleLiteralJsonArrayToLines(input) ?? input
                     }
                 }
             }
             if clipboardAnalysis.dataType != .nonText {
+                Divider()
                 Button {
                     openNewEditorFromClipboard()
                 } label: {
@@ -566,7 +563,7 @@ struct MenuBarView: View {
             Menu(transformRootMenuLabel) {
                 Menu(generalTextMenuLabel) {
                 if isSimpleLiteralJsonArray {
-                    Button("Split JSON Array ✨") {
+                    Button(TransformMenuTitles.appendSparkleIf("Split JSON Array", condition: true)) {
                         transformClipboardIfValid { input in
                             ClipboardTransform.simpleLiteralJsonArrayToLines(input) ?? input
                         }
@@ -588,7 +585,7 @@ struct MenuBarView: View {
                     Button("snake_case") { transformClipboard(ClipboardTransform.snakeCase) }
                     Button("CONST_CASE") { transformClipboard(ClipboardTransform.constCase) }
                 }
-                Menu(appendSparkleIf("Remove", condition: hasZeroWidthCharacters)) {
+                Menu(TransformMenuTitles.appendSparkleIf("Remove", condition: hasZeroWidthCharacters)) {
                     Button("Single Quotes") {
                         transformClipboard { ClipboardTransform.removeSubstring($0, target: "'") }
                     }
@@ -602,7 +599,7 @@ struct MenuBarView: View {
                         transformClipboard { ClipboardTransform.removeSubstring($0, target: " ") }
                     }
                     if (shouldShowAll || hasZeroWidthCharacters) {
-                        Button(appendSparkleIf("Zero-width Chars", condition: hasZeroWidthCharacters)) {
+                        Button(TransformMenuTitles.appendSparkleIf("Zero-width Chars", condition: hasZeroWidthCharacters)) {
                             transformClipboard(ClipboardTransform.removeZeroWidthCharacters)
                         }
                     }
@@ -765,7 +762,7 @@ struct MenuBarView: View {
                 Button(showURLExtractCredentials ? "Strip user:pass" : "Strip user") {
                     transformClipboardIfValid(ClipboardTransform.urlStripCredentialsIfValid)
                 }
-                Button(isUrlWithParams ? "Strip URL Params ✨" : "Strip URL Params") {
+                Button(TransformMenuTitles.appendSparkleIf("Strip URL Params", condition: isUrlWithParams)) {
                     transformClipboardIfValid(ClipboardTransform.stripUrlParamsIfValid)
                 }
             }
@@ -1010,7 +1007,7 @@ struct MenuBarView: View {
                     }
                 }
                 Divider()
-                Button(appendSparkleIf("CRLF → LF (strip \\r)", condition: hasCarriageReturns)) {
+                Button(TransformMenuTitles.appendSparkleIf("CRLF → LF (strip \\r)", condition: hasCarriageReturns)) {
                     transformClipboard(ClipboardTransform.windowsNewlinesToUnix)
                 }
             }
@@ -1023,7 +1020,7 @@ struct MenuBarView: View {
                     Button("Strip Empty Strings") { transformClipboard(ClipboardTransform.jsonStripEmptyStrings) }
                     Button("Top-Level Keys") { transformClipboard(ClipboardTransform.jsonTopLevelKeys) }
                     Button("All Keys") { transformClipboard(ClipboardTransform.jsonAllKeys) }
-                    Button(appendSparkleIf("Array → CSV", condition: isJsonArray && !shouldShowAll)) {
+                    Button(TransformMenuTitles.appendSparkleIf("Array → CSV", condition: isJsonArray && !shouldShowAll)) {
                         transformClipboardIfValid(ClipboardTransform.jsonArrayToCsv)
                     }
                     Button("→ YAML") { transformClipboardIfValid(ClipboardTransform.jsonToYaml) }
@@ -1148,24 +1145,24 @@ struct MenuBarView: View {
             Menu(encodeHashMenuLabel) {
                 Section("URL") {
                     Button("Encode") { transformClipboard(ClipboardTransform.urlEncode) }
-                    Button(appendSparkleIf("Decode", condition: isPossiblyURLEncoded)) {
+                    Button(TransformMenuTitles.appendSparkleIf("Decode", condition: isPossiblyURLEncoded)) {
                         transformClipboard(ClipboardTransform.urlDecode)
                     }
                 }
                 Section("Base64") {
                     Button("Encode") { transformClipboard(ClipboardTransform.base64Encode) }
-                    Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64)) {
+                    Button(TransformMenuTitles.appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64)) {
                         transformClipboard(ClipboardTransform.base64Decode)
                     }
                 }
                 Section("Base64 URL-Safe") {
                     Button("Encode") { transformClipboard(ClipboardTransform.base64URLEncode) }
-                    Button(appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64URL)) {
+                    Button(TransformMenuTitles.appendSparkleIf("Decode", condition: clipboardAnalysis.dataType == .base64URL)) {
                         transformClipboard(ClipboardTransform.base64URLDecode)
                     }
                 }
                 Section("JWT") {
-                    Button(appendSparkleIf("Decode Payload", condition: clipboardAnalysis.dataType == .jwt)) {
+                    Button(TransformMenuTitles.appendSparkleIf("Decode Payload", condition: clipboardAnalysis.dataType == .jwt)) {
                         transformClipboardIfValid(ClipboardTransform.jwtDecode)
                     }
                     Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
@@ -1308,10 +1305,12 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "←", name: "Left")) { setClipboardTo("←") }
                     Button(symbolMenuLabel(symbol: "↑", name: "Up")) { setClipboardTo("↑") }
                     Button(symbolMenuLabel(symbol: "↓", name: "Down")) { setClipboardTo("↓") }
+                    Divider()
                     Button(symbolMenuLabel(symbol: "↖", name: "Upper-Left")) { setClipboardTo("↖") }
                     Button(symbolMenuLabel(symbol: "↗", name: "Upper-Right")) { setClipboardTo("↗") }
                     Button(symbolMenuLabel(symbol: "↙", name: "Lower-Left")) { setClipboardTo("↙") }
                     Button(symbolMenuLabel(symbol: "↘", name: "Lower-Right")) { setClipboardTo("↘") }
+                    Divider()
                     Button(symbolMenuLabel(symbol: "⇒", name: "Right double")) { setClipboardTo("⇒") }
                     Button(symbolMenuLabel(symbol: "⇐", name: "Left double")) { setClipboardTo("⇐") }
                 }
@@ -1367,26 +1366,33 @@ struct MenuBarView: View {
             }
             Divider()
             Menu("Test Data") {
-                Button("JSON Array") { setClipboardTo(TestData.jsonArray) }
+                Button("Text: The Tell-tale Heart") { setClipboardTo(TestData.plainText) }
+                Button("Text List: Instruments") { setClipboardTo(TestData.instrumentsList) }
+                Button("Text: With Zero-Width Chrs") { setClipboardTo(TestData.zeroWidthSample) }
+                Divider()
                 Button("JSON Object") { setClipboardTo(TestData.jsonObject) }
+                Button("JSON Array") { setClipboardTo(TestData.jsonArray) }
+                Button("JWT") { setClipboardTo(TestData.jwt) }
+                Divider()
+                Button("YAML") { setClipboardTo(TestData.yaml) }
+                Divider()
                 Button("CSV") { setClipboardTo(TestData.csv) }
                 Button("TSV") { setClipboardTo(TestData.tsv) }
                 Button("PSV") { setClipboardTo(TestData.psv) }
-                Button("YAML") { setClipboardTo(TestData.yaml) }
-                Button("Fixed-Width (Docker ps)") { setClipboardTo(TestData.fixedWidthDockerContainers) }
-                Button("Awkable Lines") { setClipboardTo(TestData.awkWhitespaceSample) }
-                Button("Awkable Lines (slashes)") { setClipboardTo(TestData.awkDelimitedSample) }
-                Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
-                Button("JWT") { setClipboardTo(TestData.jwt) }
-                Button("Base64") { setClipboardTo(ClipboardTransform.base64Encode(TestData.plainText)) }
-                Button("Base64 URL") { setClipboardTo(ClipboardTransform.base64URLEncode(TestData.plainText)) }
-                Button("URL-encoded") { setClipboardTo(TestData.urlEncoded) }
-                Button("Plain text") { setClipboardTo(TestData.plainText) }
-                Button("Text List (Instruments)") { setClipboardTo(TestData.instrumentsList) }
-                Button("Text w/ 0-Width Chrs") { setClipboardTo(TestData.zeroWidthSample) }
+                Divider()
                 Button("MySQL CLI Table") { setClipboardTo(TestData.mysqlCLI) }
                 Button("psql CLI Table") { setClipboardTo(TestData.psqlCLI) }
                 Button("sqlite3 CLI Table") { setClipboardTo(TestData.sqlite3CLI) }
+                Divider()
+                Button("Fixed-Width (Docker ps)") { setClipboardTo(TestData.fixedWidthDockerContainers) }
+                Button("Awkable Lines") { setClipboardTo(TestData.awkWhitespaceSample) }
+                Button("Awkable Lines (slashes)") { setClipboardTo(TestData.awkDelimitedSample) }
+                Divider()
+                Button("URL with Params") { setClipboardTo(TestData.urlWithParams) }
+                Button("URL-encoded") { setClipboardTo(TestData.urlEncoded) }
+                Divider()
+                Button("Base64-Encoded") { setClipboardTo(ClipboardTransform.base64Encode(TestData.plainText)) }
+                Button("Base64-Encoded (URL)") { setClipboardTo(ClipboardTransform.base64URLEncode(TestData.plainText)) }
             }
         }
         Divider()

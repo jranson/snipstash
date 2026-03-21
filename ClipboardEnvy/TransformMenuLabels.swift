@@ -54,6 +54,10 @@ enum TransformMenuTitles {
     static func stripSparkleSuffix(_ title: String) -> String {
         title.replacingOccurrences(of: sparkleSuffix, with: "")
     }
+
+    static func appendSparkleIf(_ base: String, condition: Bool) -> String {
+        condition ? "\(base)\(sparkleSuffix)" : base
+    }
 }
 
 struct TransformMenuLabelVariant {

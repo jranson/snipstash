@@ -420,7 +420,7 @@ enum MenuOpenBridge {
         }
 
         let visibility: [String: Bool] = [
-            "Split JSON Array ✨": context.showGeneralTextSplitJSONArray
+            TransformMenuTitles.appendSparkleIf("Split JSON Array", condition: true): context.showGeneralTextSplitJSONArray
         ]
         applyVisibility(visibility, in: menu)
     }
@@ -570,7 +570,7 @@ enum MenuOpenBridge {
             "Tail Lines": context.showMultiLineTransformMenus,
             "Join Lines": context.showJoinAndCRMenus,
             "CRLF → LF (strip \\r)": context.hasCarriageReturns,
-            "CRLF → LF (strip \\r) ✨": context.hasCarriageReturns
+            TransformMenuTitles.appendSparkleIf("CRLF → LF (strip \\r)", condition: true): context.hasCarriageReturns
         ]
         applyVisibility(visibility, in: menu)
     }
