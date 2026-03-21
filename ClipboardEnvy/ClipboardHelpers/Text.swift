@@ -157,7 +157,7 @@ extension ClipboardTransform {
         return lines.joined(separator: "\n")
     }
 
-    /// Default line counts for multi-line operations (Head/Tail/Remove).
+    /// Default line counts for multiline operations (Head/Tail/Remove).
     /// Backed by UserDefaults key "RemoveLinesValues", falling back to sane defaults.
     nonisolated static func multilineRemoveValues() -> [Int] {
         let key = "RemoveLinesValues"
@@ -573,9 +573,9 @@ extension ClipboardTransform {
         return s.unicodeScalars.filter { !zeroWidthSet.contains($0) }.map(String.init).joined()
     }
 
-    // MARK: - JSON array helpers for multi-line input
+    // MARK: - JSON array helpers for multiline input
 
-    /// Converts a multi-line string into a JSON array of typed literals.
+    /// Converts a multiline string into a JSON array of typed literals.
     /// Lines that are wrapped in single or double quotes are always emitted as strings.
     nonisolated static func linesToTypedJsonArray(_ s: String) -> String {
         let lines = s.components(separatedBy: .newlines)
@@ -606,7 +606,7 @@ extension ClipboardTransform {
         return out
     }
 
-    /// Converts a multi-line string into a JSON array of strings.
+    /// Converts a multiline string into a JSON array of strings.
     nonisolated static func linesToStringJsonArray(_ s: String) -> String {
         let lines = s.components(separatedBy: .newlines)
         guard let data = try? JSONSerialization.data(withJSONObject: lines, options: []),
@@ -690,9 +690,9 @@ extension ClipboardTransform {
         return awkApply(s, tokens: tokens, delimiter: delimiter)
     }
 
-    /// Simulates a basic `awk '{print $1, $3, ...}'` over multi-line input.
+    /// Simulates a basic `awk '{print $1, $3, ...}'` over multiline input.
     /// - Parameters:
-    ///   - s: Source text (possibly multi-line).
+    ///   - s: Source text (possibly multiline).
     ///   - columns: 1-based column indices to extract in order.
     ///   - delimiter: When empty (default), treats any run of spaces/tabs as a single delimiter and
     ///                left-trims each line before splitting. When non-empty, uses the delimiter

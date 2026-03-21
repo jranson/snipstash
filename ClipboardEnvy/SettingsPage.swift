@@ -63,7 +63,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .splitJoin:
             return DictSectionConfig(
                 key: "SplitJoinDelimiters",
-                description: "Custom delimiters for Multi-line → Join / Split menu items. Each entry adds a new delimiter choice to both Join and Split sub-menus.",
+                description: "Custom delimiters for Multiline → Join / Split menu items. Each entry adds a new delimiter choice to both Join and Split sub-menus.",
                 valueHeader: "Delimiter",
                 valuePlaceholder: "\\t, |, etc.",
                 valueEditorKind: .single
@@ -87,7 +87,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .lineWrappers:
             return DictSectionConfig(
                 key: "TextLineWrappers",
-                description: "Prefix/suffix pairs for Multi-line → Wrap / Unwrap Lines. Value format: prefix|suffix (use a literal | as the separator).",
+                description: "Prefix/suffix pairs for Multiline → Wrap / Unwrap Lines. Value format: prefix|suffix (use a literal | as the separator).",
                 valueHeader: "prefix|suffix",
                 valuePlaceholder: "e.g.  <|>  or  \"|\"|\"\"",
                 valueEditorKind: .wrapper
@@ -95,7 +95,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .awkPatterns:
             return DictSectionConfig(
                 key: "AwkPrintPatterns",
-                description: "Custom awk-style print patterns for Multi-line → Awk. Supports optional -F 'X' delimiter and a {print $1 $2 …} block.",
+                description: "Custom awk-style print patterns for Multiline → Awk. Supports optional -F 'X' delimiter and a {print $1 $2 …} block.",
                 valueHeader: "Awk Command",
                 valuePlaceholder: "-F ':' '{print $1\" \"$3}'",
                 valueEditorKind: .single
@@ -792,7 +792,7 @@ private struct RemoveLinesSettingsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 SectionTitle(title: "Remove Lines")
 
-                Text("The line counts shown in Multi-line → Remove / Head / Tail sub-menus.")
+                Text("The line counts shown in Multiline → Remove / Head / Tail sub-menus.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
 
@@ -915,7 +915,7 @@ private struct FiltersSettingsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 SectionTitle(title: "Filters")
 
-                Text("Custom include/exclude filters for Multi-line → Filter Lines. Each entry adds a menu item that matches lines containing the filter string.")
+                Text("Custom include/exclude filters for Multiline → Filter Lines. Each entry adds a menu item that matches lines containing the filter string.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

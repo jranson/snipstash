@@ -23,7 +23,7 @@ enum ClipboardDataType: String, CaseIterable {
 struct ClipboardAnalysis {
     /// Marker key for legacy `displayItems` composition (divider before counts).
     static let dividerKey = "---"
-    /// Empty key in `displayItems` means show `value` only (e.g. multi-line preview rows).
+    /// Empty key in `displayItems` means show `value` only (e.g. multiline preview rows).
     static let valueOnlyKey = ""
 
     let dataType: ClipboardDataType

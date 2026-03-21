@@ -63,12 +63,12 @@ Some options are controlled via macOS defaults (no settings UI). After changing 
 | `Argon2MemoryKiB` | 65535 | Memory cost in KiB for **Encode & Hash → Argon2id Hash**. |
 | `Argon2Iterations` | 3 | Time cost (iterations) for Argon2id. |
 | `Argon2Parallelism` | 1 | Parallelism (lanes) for Argon2id. |
-| `RemoveLinesValues` | `1 2 5 10 25 50` | Line counts used for **Multi-line → Remove / Head / Tail** menu entries. |
-| `SplitJoinDelimiters` | *(none)* | Dictionary of label → delimiter used for **Multi-line → Join / Split** custom menu items. |
+| `RemoveLinesValues` | `1 2 5 10 25 50` | Line counts used for **Multiline → Remove / Head / Tail** menu entries. |
+| `SplitJoinDelimiters` | *(none)* | Dictionary of label → delimiter used for **Multiline → Join / Split** custom menu items. |
 | `TextRemoves` | *(none)* | Dictionary of label → substring to remove used for **Remove** custom menu items. |
 | `TextSwaps` | *(none)* | Dictionary of label → `"from->to"` specification used for **Swap** custom menu items. |
-| `TextLineWrappers` | *(none)* | Dictionary of label → `prefix|suffix` used for **Multi-line → Wrap / Unwrap Lines** custom menu items. |
-| `AwkPrintPatterns` | *(none)* | Dictionary of label → awk-like print commands used for **Multi-line → Awk** custom menu items. |
+| `TextLineWrappers` | *(none)* | Dictionary of label → `prefix|suffix` used for **Multiline → Wrap / Unwrap Lines** custom menu items. |
+| `AwkPrintPatterns` | *(none)* | Dictionary of label → awk-like print commands used for **Multiline → Awk** custom menu items. |
 
 **Examples (run in Terminal):**
 

@@ -471,7 +471,7 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertTrue(result.contains("key3: '1.7'"), "quoted number should be emitted as string key3: '1.7'")
         XCTAssertTrue(result.contains("subObject:"), "should contain subObject")
         XCTAssertTrue(result.contains("key4: true"), "should contain nested key4")
-        XCTAssertTrue(result.contains("\n"), "output should be multi-line")
+        XCTAssertTrue(result.contains("\n"), "output should be multiline")
     }
 
     func testJsonToYaml() throws {

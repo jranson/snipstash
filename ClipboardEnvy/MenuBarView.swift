@@ -770,26 +770,30 @@ struct MenuBarView: View {
                 }
             }
 
-            Menu("Multi-line") {
+            Menu("Multiline") {
                 let includeFilters = ClipboardTransform.customMultilineIncludeFilters()
                 let excludeFilters = ClipboardTransform.customMultilineExcludeFilters()
                 let hasAnyLineFilters = !includeFilters.isEmpty || !excludeFilters.isEmpty
-                Menu("Sort Lines") {
-                    Button("Reverse Order") { transformClipboard(ClipboardTransform.reverseLines) }
-                    Button("Alphabetically") { transformClipboard(ClipboardTransform.sortLines) }
-                    Button("By Frequency ↑") { transformClipboard(ClipboardTransform.sortLinesByFrequencyAscending) }
-                    Button("By Frequency ↓") { transformClipboard(ClipboardTransform.sortLinesByFrequencyDescending) }
-                    Button("Shuffle") { transformClipboard(ClipboardTransform.shuffleLines) }
+                Menu("Sort") {
+                    Section("Sort Lines") {
+                        Button("Reverse Order") { transformClipboard(ClipboardTransform.reverseLines) }
+                        Button("Alphabetically") { transformClipboard(ClipboardTransform.sortLines) }
+                        Button("By Frequency ↑") { transformClipboard(ClipboardTransform.sortLinesByFrequencyAscending) }
+                        Button("By Frequency ↓") { transformClipboard(ClipboardTransform.sortLinesByFrequencyDescending) }
+                        Button("Shuffle") { transformClipboard(ClipboardTransform.shuffleLines) }
+                    }
                 }
                 Divider()
                 if hasAnyLineFilters {
-                    Menu("Filter Lines") {
+                    Menu("Filter") {
                         if !includeFilters.isEmpty {
                             Menu("Include") {
-                                ForEach(includeFilters, id: \.label) { item in
-                                    Button(item.label) {
-                                        transformClipboard {
-                                            ClipboardTransform.includeLinesContaining($0, filter: item.filter)
+                                Section("Lines With") {
+                                    ForEach(includeFilters, id: \.label) { item in
+                                        Button(item.label) {
+                                            transformClipboard {
+                                                ClipboardTransform.includeLinesContaining($0, filter: item.filter)
+                                            }
                                         }
                                     }
                                 }
@@ -797,10 +801,12 @@ struct MenuBarView: View {
                         }
                         if !excludeFilters.isEmpty {
                             Menu("Exclude") {
-                                ForEach(excludeFilters, id: \.label) { item in
-                                    Button(item.label) {
-                                        transformClipboard {
-                                            ClipboardTransform.excludeLinesContaining($0, filter: item.filter)
+                                Section("Lines With") {
+                                    ForEach(excludeFilters, id: \.label) { item in
+                                        Button(item.label) {
+                                            transformClipboard {
+                                                ClipboardTransform.excludeLinesContaining($0, filter: item.filter)
+                                            }
                                         }
                                     }
                                 }
@@ -808,136 +814,60 @@ struct MenuBarView: View {
                         }
                     }
                 }
-                Menu("Collapse Lines") {
-                    Button("Deduplicate") { transformClipboard(ClipboardTransform.deduplicateLines) }
-                    Button("Dedupe + Alpha Sort") { transformClipboard(ClipboardTransform.sortAndDeduplicateLines) }
-                    Button("Drop Empty") { transformClipboard(ClipboardTransform.removeEmptyLines) }
-                    Button("Drop Unique") { transformClipboard(ClipboardTransform.removeUniqueLines) }
-                    Button("Drop Unique + Dedupe") { transformClipboard(ClipboardTransform.keepDuplicateLinesCollapsed) }
-                    Button("Drop Non-unique") { transformClipboard(ClipboardTransform.keepUniqueLines) }
-                }
-                Menu("Remove Lines") {
-                    let counts = ClipboardTransform.multilineRemoveValues()
-                    ForEach(counts, id: \.self) { n in
-                        let label = "First \(n)"
-                        Button(label) {
-                            transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
-                        }
-                    }
-                    Divider()
-                    ForEach(counts, id: \.self) { n in
-                        let label = "Last \(n)"
-                        Button(label) {
-                            transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
-                        }
+                Menu("Collapse") {
+                    Section("Collapse Lines") {
+                        Button("Deduplicate") { transformClipboard(ClipboardTransform.deduplicateLines) }
+                        Button("Dedupe + Alpha Sort") { transformClipboard(ClipboardTransform.sortAndDeduplicateLines) }
+                        Button("Drop Empty") { transformClipboard(ClipboardTransform.removeEmptyLines) }
+                        Button("Drop Unique") { transformClipboard(ClipboardTransform.removeUniqueLines) }
+                        Button("Drop Unique + Dedupe") { transformClipboard(ClipboardTransform.keepDuplicateLinesCollapsed) }
+                        Button("Drop Non-unique") { transformClipboard(ClipboardTransform.keepUniqueLines) }
                     }
                 }
-                Menu("Head Lines") {
-                    let counts = ClipboardTransform.multilineRemoveValues()
-                    ForEach(counts, id: \.self) { n in
-                        let label = "\(n)"
-                        Button(label) {
-                            transformClipboard { ClipboardTransform.headLines($0, count: n) }
-                        }
-                    }
-                }
-                Menu("Tail Lines") {
-                    let counts = ClipboardTransform.multilineRemoveValues()
-                    ForEach(counts, id: \.self) { n in
-                        let label = "\(n)"
-                        Button(label) {
-                            transformClipboard { ClipboardTransform.tailLines($0, count: n) }
-                        }
-                    }
-                }
-                Divider()
-
-                Menu("Indent Lines") {
-                    Section("Indent") {
-                        Button("1 Tab") {
-                            transformClipboard { input in
-                                ClipboardTransform.indentLines(input, indent: "\t")
-                            }
-                        }
-                        Button("2 Spaces") {
-                            transformClipboard { input in
-                                ClipboardTransform.indentLines(input, indent: "  ")
-                            }
-                        }
-                        Button("4 Spaces") {
-                            transformClipboard { input in
-                                ClipboardTransform.indentLines(input, indent: "    ")
-                            }
-                        }
-                    }
-                    Section("Un-indent") {
-                        Button("1 Tab") {
-                            transformClipboard { input in
-                                ClipboardTransform.unindentLines(input, indent: "\t")
-                            }
-                        }
-                        Button("2 Spaces") {
-                            transformClipboard { input in
-                                ClipboardTransform.unindentLines(input, indent: "  ")
-                            }
-                        }
-                        Button("4 Spaces") {
-                            transformClipboard { input in
-                                ClipboardTransform.unindentLines(input, indent: "    ")
-                            }
-                        }
-                    }
-                }
-
-                Menu("Wrap Lines") {
-                    ForEach(ClipboardTransform.builtinMultilineWrappers(), id: \.label) { item in
-                        Button(item.label) {
-                            transformClipboard {
-                                ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
-                            }
-                        }
-                    }
-                    let custom = ClipboardTransform.customMultilineWrappers()
-                    if !custom.isEmpty {
+                Menu("Remove") {
+                    Section("Remove Lines") {
                         Divider()
-                        ForEach(custom, id: \.label) { item in
-                            Button(item.label) {
-                                transformClipboard {
-                                    ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
-                                }
+                        let counts = ClipboardTransform.multilineRemoveValues()
+                        ForEach(counts, id: \.self) { n in
+                            let label = "First \(n)"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.removeFirstLines($0, count: n) }
+                            }
+                        }
+                        Divider()
+                        ForEach(counts, id: \.self) { n in
+                            let label = "Last \(n)"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
+                            }
+                        }
+                    }
+                }
+                Menu("Head") {
+                    Section("Return First") {
+                        let counts = ClipboardTransform.multilineRemoveValues()
+                        ForEach(counts, id: \.self) { n in
+                            let label = "\(n) Lines"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.headLines($0, count: n) }
+                            }
+                        }
+                    }
+                }
+                Menu("Tail") {
+                    Section("Return Last") {
+                        let counts = ClipboardTransform.multilineRemoveValues()
+                        ForEach(counts, id: \.self) { n in
+                            let label = "\(n) Lines"
+                            Button(label) {
+                                transformClipboard { ClipboardTransform.tailLines($0, count: n) }
                             }
                         }
                     }
                 }
 
-                Menu("Unwrap Lines") {
-                    ForEach(ClipboardTransform.builtinMultilineWrappers(), id: \.label) { item in
-                        Button(item.label) {
-                            transformClipboard {
-                                ClipboardTransform.unwrapLines($0, prefix: item.prefix, suffix: item.suffix)
-                            }
-                        }
-                    }
-                    let customUnwrap = ClipboardTransform.customMultilineWrappers()
-                    if !customUnwrap.isEmpty {
-                        Divider()
-                        ForEach(customUnwrap, id: \.label) { item in
-                            Button(item.label) {
-                                transformClipboard {
-                                    ClipboardTransform.unwrapLines($0, prefix: item.prefix, suffix: item.suffix)
-                                }
-                            }
-                        }
-                    }
-                }
-                Menu("Trim Lines") {
-                    Button("Whitespace") { transformClipboard(ClipboardTransform.trimLines) }
-                    Button("Trailing Commas") { transformClipboard(ClipboardTransform.trimTrailingCommas) }
-                    Button("Trailing Semicolons") { transformClipboard(ClipboardTransform.trimTrailingSemicolons) }
-                }
-                Divider()
-                Menu("Join Lines") {
-                    Section("Join With") {
+                Menu("Join") {
+                    Section("Join Lines With") {
                         ForEach(ClipboardTransform.builtinMultilineJoiners(), id: \.label) { item in
                             Button(item.label) {
                                 transformClipboard { ClipboardTransform.joinLines($0, delimiter: item.delimiter) }
@@ -967,25 +897,118 @@ struct MenuBarView: View {
                     Divider()
                 }
 
-                Menu("Awk Lines") {
-                    ForEach(1...8, id: \.self) { n in
-                        Button("{print $\(n)}") {
-                            transformClipboard { input in
-                                ClipboardTransform.awk(input, command: "{print $\(n)}")
+                Menu("Awk") {
+                    Section("Awk Lines") {
+                        ForEach(1...8, id: \.self) { n in
+                            Button("{print $\(n)}") {
+                                transformClipboard { input in
+                                    ClipboardTransform.awk(input, command: "{print $\(n)}")
+                                }
                             }
                         }
-                    }
-                    Divider()
-                    let customAwkPatterns = ClipboardTransform.customAwkPrintPatterns()
-                    ForEach(customAwkPatterns, id: \.label) { pattern in
-                        Button(pattern.label) {
-                            transformClipboard { input in
-                                ClipboardTransform.awk(input, command: pattern.command)
+                        Divider()
+                        let customAwkPatterns = ClipboardTransform.customAwkPrintPatterns()
+                        ForEach(customAwkPatterns, id: \.label) { pattern in
+                            Button(pattern.label) {
+                                transformClipboard { input in
+                                    ClipboardTransform.awk(input, command: pattern.command)
+                                }
                             }
                         }
                     }
                 }
 
+                Divider()
+
+                Menu("Indenting") {
+                    Section("Indent Lines") {
+                        Button("1 Tab") {
+                            transformClipboard { input in
+                                ClipboardTransform.indentLines(input, indent: "\t")
+                            }
+                        }
+                        Button("2 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.indentLines(input, indent: "  ")
+                            }
+                        }
+                        Button("4 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.indentLines(input, indent: "    ")
+                            }
+                        }
+                    }
+                    Section("Un-indent Lines") {
+                        Button("1 Tab") {
+                            transformClipboard { input in
+                                ClipboardTransform.unindentLines(input, indent: "\t")
+                            }
+                        }
+                        Button("2 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.unindentLines(input, indent: "  ")
+                            }
+                        }
+                        Button("4 Spaces") {
+                            transformClipboard { input in
+                                ClipboardTransform.unindentLines(input, indent: "    ")
+                            }
+                        }
+                    }
+                }
+
+                Menu("Surround") {
+                    Section("Surround Lines") {
+                        ForEach(ClipboardTransform.builtinMultilineWrappers(), id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                                }
+                            }
+                        }
+                        let custom = ClipboardTransform.customMultilineWrappers()
+                        if !custom.isEmpty {
+                            Divider()
+                            ForEach(custom, id: \.label) { item in
+                                Button(item.label) {
+                                    transformClipboard {
+                                        ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Menu("Un-surround") {
+                    Section("Un-surround Lines") {
+                        ForEach(ClipboardTransform.builtinMultilineWrappers(), id: \.label) { item in
+                            Button(item.label) {
+                                transformClipboard {
+                                    ClipboardTransform.unwrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                                }
+                            }
+                        }
+                        let customUnwrap = ClipboardTransform.customMultilineWrappers()
+                        if !customUnwrap.isEmpty {
+                            Divider()
+                            ForEach(customUnwrap, id: \.label) { item in
+                                Button(item.label) {
+                                    transformClipboard {
+                                        ClipboardTransform.unwrapLines($0, prefix: item.prefix, suffix: item.suffix)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Menu("Trim") {
+                    Section("Trim Lines") {
+                        Button("Whitespace") { transformClipboard(ClipboardTransform.trimLines) }
+                        Button("Trailing Commas") { transformClipboard(ClipboardTransform.trimTrailingCommas) }
+                        Button("Trailing Semicolons") { transformClipboard(ClipboardTransform.trimTrailingSemicolons) }
+                    }
+                }
                 Divider()
                 Button(appendSparkleIf("CRLF → LF (strip \\r)", condition: hasCarriageReturns)) {
                     transformClipboard(ClipboardTransform.windowsNewlinesToUnix)

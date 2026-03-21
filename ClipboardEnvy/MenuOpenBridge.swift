@@ -391,7 +391,7 @@ enum MenuOpenBridge {
             } else if managedKey == TransformMenuTitles.databaseCLI,
                       let submenu = topLevelItem.submenu {
                 applyDatabaseCLIMenuVisibility(in: submenu, shouldShowAll: shouldShowAll, context: context)
-            } else if topLevelTitle == "Multi-line",
+            } else if topLevelTitle == "Multiline",
                       let submenu = topLevelItem.submenu {
                 applyMultiLineMenuVisibility(in: submenu, shouldShowAll: shouldShowAll, context: context)
             } else if topLevelTitle == "Encode / Hash",
