@@ -21,27 +21,50 @@ enum ClipboardDataType: String, CaseIterable {
 /// Result of clipboard analysis with type-safe access to detected properties.
 /// Uses ordered array to preserve insertion order for display.
 struct ClipboardAnalysis {
-    /// Marker key for divider in displayItems
+    /// Marker key for legacy `displayItems` composition (divider before counts).
     static let dividerKey = "---"
+    /// Empty key in `displayItems` means show `value` only (e.g. multi-line preview rows).
+    static let valueOnlyKey = ""
 
     let dataType: ClipboardDataType
     private var orderedProperties: [(key: String, value: String)] = []
     private var textMetrics: [(key: String, value: String)] = []
+    private var previewOnlyLines: [String] = []
 
     init(dataType: ClipboardDataType) {
         self.dataType = dataType
     }
 
-    /// All analysis key-value pairs for display, including dataType.
-    /// Text metrics (Characters, Words, Lines, Em Dashes) are always last, preceded by a divider marker.
+    /// Data type plus detected properties (menu **Analysis** section; no section header in UI).
+    var analysisDisplayItems: [(key: String, value: String)] {
+        [("Data Type", dataType.rawValue)] + orderedProperties
+    }
+
+    /// Truncated plaintext-style lines for menu **Preview** section (decoded body for Base64, clipboard text for other types).
+    var previewLines: [String] {
+        previewOnlyLines
+    }
+
+    /// Character/word/line and related metrics (menu **Counts** section; no section header in UI).
+    var countDisplayItems: [(key: String, value: String)] {
+        textMetrics
+    }
+
+    /// Flattened stream for tests and callers that expect a single list (analysis, then preview rows, then counts).
     var displayItems: [(key: String, value: String)] {
-        var items: [(String, String)] = [("Data Type", dataType.rawValue)]
-        items.append(contentsOf: orderedProperties)
+        var items = analysisDisplayItems
+        for line in previewOnlyLines {
+            items.append((Self.valueOnlyKey, line))
+        }
         if !textMetrics.isEmpty {
             items.append((Self.dividerKey, ""))
             items.append(contentsOf: textMetrics)
         }
         return items
+    }
+
+    mutating func appendPreviewOnlyLines(_ lines: [String]) {
+        previewOnlyLines.append(contentsOf: lines)
     }
 
     mutating func setTextMetric(_ key: String, _ value: String) {
@@ -169,36 +192,102 @@ struct ClipboardAnalysis {
 enum ClipboardAnalyzer {
 
     /// Analyze clipboard text content and return structured analysis.
-    /// Returns nil if input is nil (non-text clipboard).
-    static func analyze(_ text: String?) -> ClipboardAnalysis {
+    /// - Parameters:
+    ///   - text: Clipboard string, or nil when non-text.
+    ///   - menuLabelMaxChars: Max characters per preview line (same semantics as snippet menu titles); clamped to 10...64.
+    ///   - clipboardPreviewMaxLines: Max non-empty preview lines in the analysis menu; clamped to 0...20.
+    static func analyze(_ text: String?, menuLabelMaxChars: Int = 36, clipboardPreviewMaxLines: Int = 5) -> ClipboardAnalysis {
         guard let text = text else {
             return ClipboardAnalysis(dataType: .nonText)
         }
 
+        let maxLineLen = min(max(menuLabelMaxChars, 10), 64)
+        let previewMaxLines = min(max(clipboardPreviewMaxLines, 0), 20)
+
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            return analyzeGeneralText(text)
+            return finish(analyzeGeneralText(text), sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines)
         }
 
-        if let analysis = detectJWT(trimmed, original: text) { return analysis }
-        if let analysis = detectURL(trimmed, original: text) { return analysis }
-        if let analysis = detectTime(trimmed, original: text) { return analysis }
-        if let analysis = detectBase64URL(trimmed, original: text) { return analysis }
-        if let analysis = detectBase64(trimmed, original: text) { return analysis }
-        if let analysis = detectJSON(trimmed, original: text) { return analysis }
-        if let analysis = detectDatabaseCLITable(trimmed, original: text) { return analysis }
-        if let analysis = detectFixedWidthTable(trimmed, original: text) { return analysis }
-        if let analysis = detectCSV(trimmed, original: text) { return analysis }
-        if let analysis = detectTSV(trimmed, original: text) { return analysis }
-        if let analysis = detectPSV(trimmed, original: text) { return analysis }
-        if let analysis = detectYAML(trimmed, original: text) { return analysis }
+        if let analysis = detectJWT(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectURL(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectTime(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectBase64URL(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectBase64(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectJSON(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectDatabaseCLITable(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectFixedWidthTable(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectCSV(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectTSV(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectPSV(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectYAML(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
 
-        return analyzeGeneralText(text)
+        return finish(analyzeGeneralText(text), sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines)
+    }
+
+    private static func finish(_ analysis: ClipboardAnalysis, sourceText: String, maxLineLen: Int, previewMaxLines: Int) -> ClipboardAnalysis {
+        var a = analysis
+        if previewMaxLines > 0, shouldAppendPlaintextStylePreview(for: a.dataType) {
+            let lines = buildPreviewLines(from: sourceText, maxLineLength: maxLineLen, maxLines: previewMaxLines)
+            a.appendPreviewOnlyLines(lines)
+        }
+        return a
+    }
+
+    private static func shouldAppendPlaintextStylePreview(for dataType: ClipboardDataType) -> Bool {
+        switch dataType {
+        case .nonText, .jwt, .base64, .base64URL:
+            return false
+        default:
+            return true
+        }
+    }
+
+    /// First up to `maxLines` non-empty lines (by trimming whitespace/newlines), each truncated like snippet menu titles.
+    private static func buildPreviewLines(from text: String, maxLineLength: Int, maxLines: Int) -> [String] {
+        guard maxLines > 0 else { return [] }
+        var lines: [String] = []
+        for line in text.components(separatedBy: .newlines) {
+            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }
+            lines.append(truncateForMenuLabel(line, limit: maxLineLength))
+            if lines.count >= maxLines { break }
+        }
+        return lines
+    }
+
+    private static func truncateForMenuLabel(_ text: String, limit: Int) -> String {
+        if text.count <= limit { return text }
+        let idx = text.index(text.startIndex, offsetBy: limit)
+        return String(text[..<idx]) + "…"
     }
 
     // MARK: - Type Detection
 
-    private static func detectJWT(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+    private static func jwtPayloadClaimDisplayString(key: String, value: Any) -> String {
+        if let stringValue = value as? String {
+            return stringValue
+        }
+        if let numValue = value as? NSNumber {
+            if isTimestampClaim(key), let date = dateFromTimestamp(numValue) {
+                return formatTimestampLocal(date)
+            }
+            return "\(numValue)"
+        }
+        if let boolValue = value as? Bool {
+            return boolValue ? "true" : "false"
+        }
+        if let arrayValue = value as? [Any] {
+            let items = arrayValue.compactMap { item -> String? in
+                if let s = item as? String { return s }
+                if let n = item as? NSNumber { return "\(n)" }
+                return nil
+            }
+            return items.joined(separator: ", ")
+        }
+        return String(describing: value)
+    }
+
+    private static func detectJWT(_ trimmed: String, original: String, maxLineLen: Int, previewMaxLines: Int) -> ClipboardAnalysis? {
         let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 3 else { return nil }
 
@@ -221,31 +310,17 @@ enum ClipboardAnalyzer {
             analysis.set("Type", typ)
         }
 
-        if let payloadData = base64URLDecodeToData(payloadPart),
+        if previewMaxLines > 0,
+           let payloadData = base64URLDecodeToData(payloadPart),
            let payloadJSON = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
+            var lines: [String] = []
             for (key, value) in payloadJSON.sorted(by: { $0.key < $1.key }) {
-                let displayKey = "Payload: \(key)"
-                if let stringValue = value as? String {
-                    analysis.set(displayKey, stringValue)
-                } else if let numValue = value as? NSNumber {
-                    if isTimestampClaim(key), let date = dateFromTimestamp(numValue) {
-                        analysis.set(displayKey, formatTimestampLocal(date))
-                    } else {
-                        analysis.set(displayKey, "\(numValue)")
-                    }
-                } else if let boolValue = value as? Bool {
-                    analysis.set(displayKey, boolValue ? "true" : "false")
-                } else if let arrayValue = value as? [Any] {
-                    let items = arrayValue.compactMap { item -> String? in
-                        if let s = item as? String { return s }
-                        if let n = item as? NSNumber { return "\(n)" }
-                        return nil
-                    }
-                    analysis.set(displayKey, items.joined(separator: ", "))
-                } else {
-                    analysis.set(displayKey, String(describing: value))
-                }
+                guard lines.count < previewMaxLines else { break }
+                let valueStr = jwtPayloadClaimDisplayString(key: key, value: value)
+                let line = "\(key): \(valueStr)"
+                lines.append(truncateForMenuLabel(line, limit: maxLineLen))
             }
+            analysis.appendPreviewOnlyLines(lines)
         }
 
         return analysis
@@ -296,7 +371,7 @@ enum ClipboardAnalyzer {
         return analysis
     }
 
-    private static func detectBase64URL(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+    private static func detectBase64URL(_ trimmed: String, original: String, maxLineLen: Int, previewMaxLines: Int) -> ClipboardAnalysis? {
         guard trimmed.count >= 4,
               !trimmed.contains("+"),
               !trimmed.contains("/"),
@@ -312,13 +387,13 @@ enum ClipboardAnalyzer {
         addTextMetrics(to: &analysis, text: decodedString)
         analysis.set("Encoded Size", "\(original.utf8.count) bytes")
         analysis.set("Decoded Size", "\(decoded.count) bytes")
-        let preview = decodedString.prefix(32)
-        analysis.set("Decoded Preview", String(preview) + (decodedString.count > 32 ? "…" : ""))
+        let lines = buildPreviewLines(from: decodedString, maxLineLength: maxLineLen, maxLines: previewMaxLines)
+        analysis.appendPreviewOnlyLines(lines)
 
         return analysis
     }
 
-    private static func detectBase64(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+    private static func detectBase64(_ trimmed: String, original: String, maxLineLen: Int, previewMaxLines: Int) -> ClipboardAnalysis? {
         guard trimmed.count >= 4,
               isValidBase64Chars(trimmed) else { return nil }
 
@@ -332,8 +407,8 @@ enum ClipboardAnalyzer {
         addTextMetrics(to: &analysis, text: decodedString)
         analysis.set("Encoded Size", "\(original.utf8.count) bytes")
         analysis.set("Decoded Size", "\(decoded.count) bytes")
-        let preview = decodedString.prefix(32)
-        analysis.set("Decoded Preview", String(preview) + (decodedString.count > 32 ? "…" : ""))
+        let lines = buildPreviewLines(from: decodedString, maxLineLength: maxLineLen, maxLines: previewMaxLines)
+        analysis.appendPreviewOnlyLines(lines)
 
         return analysis
     }

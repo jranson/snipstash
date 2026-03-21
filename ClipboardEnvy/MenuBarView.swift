@@ -8,6 +8,8 @@ struct MenuBarView: View {
     @AppStorage("recentSnippetsMenuCount") private var recentSnippetsMenuCount = 10
     private static let snippetMenuLabelMaxCharsRange: ClosedRange<Int> = 10...64
     @AppStorage("snippetMenuLabelMaxChars") private var snippetMenuLabelMaxChars = 36
+    private static let clipboardPreviewMaxLinesRange: ClosedRange<Int> = 0...20
+    @AppStorage("clipboardPreviewMaxLines") private var clipboardPreviewMaxLines = 5
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openWindow) private var openWindow
@@ -97,16 +99,6 @@ struct MenuBarView: View {
             return false
         }
         return ClipboardTransform.isSimpleLiteralJsonArray(text)
-    }
-
-    private var showQuickAction: Bool {
-        [.jwt, .base64, .base64URL].contains(clipboardAnalysis.dataType)
-            || isUrlWithParams
-            || hasCarriageReturns
-            // Only treat JSON arrays as a quick action source when they are
-            // not simple literal lists; those should be hidden unless Option is held.
-            || (isJsonArray && !isSimpleLiteralJsonArray)
-            || hasZeroWidthCharacters
     }
 
     private var isPossiblyURLEncoded: Bool {
@@ -512,16 +504,26 @@ struct MenuBarView: View {
         }
         Divider()
         Menu("Clipboard Data Analysis") {
-            ForEach(Array(clipboardAnalysis.displayItems.enumerated()), id: \.offset) { _, item in
-                if item.key == ClipboardAnalysis.dividerKey {
-                    Divider()
-                } else {
+            ForEach(Array(clipboardAnalysis.analysisDisplayItems.enumerated()), id: \.offset) { _, item in
+                Text("\(item.key): \(item.value)")
+            }
+            if !clipboardAnalysis.previewLines.isEmpty {
+                Divider()
+                Section("Preview") {
+                    ForEach(Array(clipboardAnalysis.previewLines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                    }
+                }
+            }
+            if !clipboardAnalysis.countDisplayItems.isEmpty {
+                Divider()
+                ForEach(Array(clipboardAnalysis.countDisplayItems.enumerated()), id: \.offset) { _, item in
                     Text("\(item.key): \(item.value)")
                 }
             }
-            if showQuickAction {
-                Divider()
-            }
+
+            Divider()
+            
             if clipboardAnalysis.dataType == .jwt {
                 Button("Decode JWT Payload ✨") { transformClipboardIfValid(ClipboardTransform.jwtDecode) }
             }
@@ -550,6 +552,13 @@ struct MenuBarView: View {
                     transformClipboardIfValid { input in
                         ClipboardTransform.simpleLiteralJsonArrayToLines(input) ?? input
                     }
+                }
+            }
+            if clipboardAnalysis.dataType != .nonText {
+                Button {
+                    openNewEditorFromClipboard()
+                } label: {
+                    Label("Open in Editor", systemImage: "square.and.pencil")
                 }
             }
         }
@@ -1556,7 +1565,19 @@ struct MenuBarView: View {
     private func refreshClipboardAnalysis() {
         refreshOptionStatus()
         let clipboardText = ClipboardIO.readString()
-        clipboardAnalysis = ClipboardAnalyzer.analyze(clipboardText)
+        let menuLabelLimit = min(
+            max(snippetMenuLabelMaxChars, Self.snippetMenuLabelMaxCharsRange.lowerBound),
+            Self.snippetMenuLabelMaxCharsRange.upperBound
+        )
+        let previewLineLimit = min(
+            max(clipboardPreviewMaxLines, Self.clipboardPreviewMaxLinesRange.lowerBound),
+            Self.clipboardPreviewMaxLinesRange.upperBound
+        )
+        clipboardAnalysis = ClipboardAnalyzer.analyze(
+            clipboardText,
+            menuLabelMaxChars: menuLabelLimit,
+            clipboardPreviewMaxLines: previewLineLimit
+        )
 
         if clipboardAnalysis.isDelimitedData, let text = clipboardText {
             csvColumnHeaders = ClipboardTransform.columnHeaders(text, maxColumns: 26)

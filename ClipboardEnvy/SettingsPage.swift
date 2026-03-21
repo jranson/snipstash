@@ -492,9 +492,11 @@ struct SettingsClipboardEnvyView: View {
 private struct GeneralSettingsView: View {
     private static let recentSnippetsMenuCountRange: ClosedRange<Int> = 0...20
     private static let snippetMenuLabelMaxCharsRange: ClosedRange<Int> = 10...64
+    private static let clipboardPreviewMaxLinesRange: ClosedRange<Int> = 0...20
 
     @AppStorage("recentSnippetsMenuCount") private var recentSnippetsMenuCount = 10
     @AppStorage("snippetMenuLabelMaxChars") private var snippetMenuLabelMaxChars = 36
+    @AppStorage("clipboardPreviewMaxLines") private var clipboardPreviewMaxLines = 5
 
     var body: some View {
         ScrollView {
@@ -505,7 +507,7 @@ private struct GeneralSettingsView: View {
                     VStack(spacing: 0) {
                         Argon2Row(
                             label: "Recent Snippets in Menu",
-                            description: "Number of recent snippets shown at the top-level. Default: 10",
+                            description: "Number of recent snippets shown in the menu. Default: 10",
                             value: $recentSnippetsMenuCount,
                             range: Self.recentSnippetsMenuCountRange,
                             step: 1
@@ -518,12 +520,17 @@ private struct GeneralSettingsView: View {
                             range: Self.snippetMenuLabelMaxCharsRange,
                             step: 1
                         )
+                        Divider().padding(.leading, 16)
+                        Argon2Row(
+                            label: "Clipboard Analysis Preview Lines",
+                            description: "Number of Preview lines shown in the Clipboard Data Analysis menu. Default: 5",
+                            value: $clipboardPreviewMaxLines,
+                            range: Self.clipboardPreviewMaxLinesRange,
+                            step: 1
+                        )
                     }
                 }
 
-                Spacer()
-                Spacer()
-                Spacer()
                 Spacer()
                 Spacer()
 
@@ -549,6 +556,12 @@ private struct GeneralSettingsView: View {
             let clamped = min(max(v, Self.snippetMenuLabelMaxCharsRange.lowerBound), Self.snippetMenuLabelMaxCharsRange.upperBound)
             if clamped != v {
                 snippetMenuLabelMaxChars = clamped
+            }
+        }
+        .onChange(of: clipboardPreviewMaxLines) { _, v in
+            let clamped = min(max(v, Self.clipboardPreviewMaxLinesRange.lowerBound), Self.clipboardPreviewMaxLinesRange.upperBound)
+            if clamped != v {
+                clipboardPreviewMaxLines = clamped
             }
         }
     }

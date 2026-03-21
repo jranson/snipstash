@@ -2147,8 +2147,10 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(analysis.dataType, .base64)
         XCTAssertNotNil(analysis["Encoded Size"])
         XCTAssertNotNil(analysis["Decoded Size"])
-        XCTAssertNotNil(analysis["Decoded Preview"])
+        XCTAssertNil(analysis["Decoded Preview"])
         XCTAssertEqual(analysis["Lines"], "37")
+        XCTAssertEqual(analysis.previewLines.count, 5)
+        XCTAssertTrue(analysis.previewLines[0].hasPrefix("The Tell-Tale Heart"))
     }
 
     func testAnalyzer_base64URLFile() throws {
@@ -2157,8 +2159,56 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(analysis.dataType, .base64URL)
         XCTAssertNotNil(analysis["Encoded Size"])
         XCTAssertNotNil(analysis["Decoded Size"])
-        XCTAssertNotNil(analysis["Decoded Preview"])
+        XCTAssertNil(analysis["Decoded Preview"])
         XCTAssertEqual(analysis["Lines"], "37")
+        XCTAssertEqual(analysis.previewLines.count, 5)
+    }
+
+    func testAnalyzer_displayPreview_generalText_skipsBlankLines() {
+        let content = "alpha\n\n  \t\nbeta"
+        let analysis = ClipboardAnalyzer.analyze(content, menuLabelMaxChars: 36)
+        XCTAssertEqual(analysis.dataType, .generalText)
+        XCTAssertEqual(analysis.previewLines, ["alpha", "beta"])
+    }
+
+    func testAnalyzer_displayPreview_atMostFiveLines() {
+        let content = (1...8).map { "line\($0)" }.joined(separator: "\n")
+        let analysis = ClipboardAnalyzer.analyze(content, menuLabelMaxChars: 36)
+        XCTAssertEqual(analysis.previewLines, ["line1", "line2", "line3", "line4", "line5"])
+    }
+
+    func testAnalyzer_displayPreview_truncatesWithEllipsis() {
+        let long = String(repeating: "x", count: 40)
+        let analysis = ClipboardAnalyzer.analyze(long, menuLabelMaxChars: 10)
+        XCTAssertEqual(analysis.previewLines.count, 1)
+        XCTAssertEqual(analysis.previewLines[0].count, 11)
+        XCTAssertTrue(analysis.previewLines[0].hasSuffix("…"))
+    }
+
+    func testAnalyzer_displayPreview_respectsMaxLinesParameter() {
+        let content = "a\nb\nc\nd\ne\nf"
+        let analysis = ClipboardAnalyzer.analyze(content, clipboardPreviewMaxLines: 2)
+        XCTAssertEqual(analysis.previewLines, ["a", "b"])
+    }
+
+    func testAnalyzer_displayPreview_zeroLinesOmitsValueOnlyRows() {
+        let content = "only\none"
+        let analysis = ClipboardAnalyzer.analyze(content, clipboardPreviewMaxLines: 0)
+        XCTAssertTrue(analysis.previewLines.isEmpty)
+    }
+
+    func testAnalyzer_jwtPayloadAppearsInPreviewWithoutPayloadPrefix() throws {
+        let jwt = try readTestdata("sample-jwt-encoded.txt")
+        let analysis = ClipboardAnalyzer.analyze(jwt.trimmingCharacters(in: .whitespacesAndNewlines))
+        XCTAssertEqual(analysis.dataType, .jwt)
+        XCTAssertTrue(analysis.analysisDisplayItems.filter { $0.key.hasPrefix("Payload:") }.isEmpty)
+        XCTAssertEqual(analysis["Algorithm"], "HS256")
+        XCTAssertEqual(analysis["Type"], "JWT")
+        XCTAssertEqual(analysis.previewLines.count, 4)
+        XCTAssertTrue(analysis.previewLines.contains { $0.hasPrefix("sub:") })
+        XCTAssertTrue(analysis.previewLines.contains { $0.hasPrefix("name:") })
+        XCTAssertTrue(analysis.previewLines.contains { $0.hasPrefix("admin:") })
+        XCTAssertTrue(analysis.previewLines.contains { $0.hasPrefix("iat:") })
     }
 
     func testAnalyzer_mysqlCliFile() throws {
