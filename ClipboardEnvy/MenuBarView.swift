@@ -1234,8 +1234,40 @@ struct MenuBarView: View {
                     Button("YY/MM/DD (UTC)") { setClipboardToYYMMDDUTC() }
                 }
             }
-            Menu("Symbol") {
-                Menu("General") {
+            Menu("Random") {
+                Section("UUID") {
+                    Button("Lowercase") { setClipboardToRandomUUIDLowercase() }
+                    Button("Uppercase") { setClipboardToRandomUUID() }
+                }
+                Divider()
+                Button("ULID") { setClipboardToRandomULID() }
+                Button("NanoID") { setClipboardToRandomNanoID() }
+                Divider()
+                Section("Hex Strings") {
+                    Button("6 Bytes / 12 Chr") { setClipboardToRandomHex(byteCount: 6) }
+                    Button("8 Bytes / 16 Chr") { setClipboardToRandomHex(byteCount: 8) }
+                    Button("16 Bytes / 32 Chr") { setClipboardToRandomHex(byteCount: 16) }
+                    Button("32 Bytes / 64 Chr") { setClipboardToRandomHex(byteCount: 32) }
+                }
+                Divider()
+                Section("Generate Password") {
+                    Button("Very Complex") { setClipboardToRandomVeryComplexPassword() }
+                    Button("Complex") { setClipboardToRandomComplexPassword() }
+                    Button("Alphanumeric") { setClipboardToRandomAlphanumericPassword() }
+                }
+            }
+            Menu("Filler") {
+                Button("Lorem Ipsum (Short)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderShort) }
+                Button("Lorem Ipsum (Medium)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderMedium) }
+                Button("Lorem Ipsum (Full)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderFull) }
+                Button("The Quick Brown Fox") { setClipboardTo(ClipboardSet.quickBrownFoxPlaceholder) }
+                Button("Pack My Box") { setClipboardTo(ClipboardSet.packMyBoxPlaceholder) }
+                Button("Sphinx of Black Quartz") { setClipboardTo(ClipboardSet.sphinxOfBlackQuartzPlaceholder) }
+                Button("Waltz, Bad Nymph") { setClipboardTo(ClipboardSet.waltzBadNymphPlaceholder) }
+                Button("Jackdaws") { setClipboardTo(ClipboardSet.jackdawsPlaceholder) }
+            }
+            Section("Symbols") {
+                Menu("Typography") {
                     Button(symbolMenuLabel(symbol: "—", name: "Em dash")) { setClipboardTo("—") }
                     Button(symbolMenuLabel(symbol: "–", name: "En dash", padding: " ")) { setClipboardTo("–") }
                     Button(symbolMenuLabel(symbol: "…", name: "Ellipsis")) { setClipboardTo("…") }
@@ -1346,38 +1378,6 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "$", name: "Dollar")) { setClipboardTo("$") }
                     Button(symbolMenuLabel(symbol: "¢", name: "Cent")) { setClipboardTo("¢") }
                 }
-            }
-            Menu("Random") {
-                Section("UUID") {
-                    Button("Lowercase") { setClipboardToRandomUUIDLowercase() }
-                    Button("Uppercase") { setClipboardToRandomUUID() }
-                }
-                Divider()
-                Button("ULID") { setClipboardToRandomULID() }
-                Button("NanoID") { setClipboardToRandomNanoID() }
-                Divider()
-                Section("Hex Strings") {
-                    Button("6 Bytes / 12 Chr") { setClipboardToRandomHex(byteCount: 6) }
-                    Button("8 Bytes / 16 Chr") { setClipboardToRandomHex(byteCount: 8) }
-                    Button("16 Bytes / 32 Chr") { setClipboardToRandomHex(byteCount: 16) }
-                    Button("32 Bytes / 64 Chr") { setClipboardToRandomHex(byteCount: 32) }
-                }
-                Divider()
-                Section("Generate Password") {
-                    Button("Very Complex") { setClipboardToRandomVeryComplexPassword() }
-                    Button("Complex") { setClipboardToRandomComplexPassword() }
-                    Button("Alphanumeric") { setClipboardToRandomAlphanumericPassword() }
-                }
-            }
-            Menu("Filler") {
-                Button("Lorem Ipsum (Short)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderShort) }
-                Button("Lorem Ipsum (Medium)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderMedium) }
-                Button("Lorem Ipsum (Full)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderFull) }
-                Button("The Quick Brown Fox") { setClipboardTo(ClipboardSet.quickBrownFoxPlaceholder) }
-                Button("Pack My Box") { setClipboardTo(ClipboardSet.packMyBoxPlaceholder) }
-                Button("Sphinx of Black Quartz") { setClipboardTo(ClipboardSet.sphinxOfBlackQuartzPlaceholder) }
-                Button("Waltz, Bad Nymph") { setClipboardTo(ClipboardSet.waltzBadNymphPlaceholder) }
-                Button("Jackdaws") { setClipboardTo(ClipboardSet.jackdawsPlaceholder) }
             }
             Divider()
             Menu("Test Data") {
