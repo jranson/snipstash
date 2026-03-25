@@ -15,6 +15,8 @@ enum ClipboardDataType: String, CaseIterable {
     case yaml = "YAML"
     case fixedWidthTable = "Table"
     case databaseCLITable = "Database CLI Table"
+    case binaryValue = "Binary Value"
+    case hexadecimal = "Hexadecimal Value"
     case generalText = "General Text"
 }
 
@@ -211,9 +213,12 @@ enum ClipboardAnalyzer {
 
         if let analysis = detectJWT(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectURL(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        // Before Time: numeric-looking bit strings (e.g. `10101010`) must not be parsed as epoch values.
+        if let analysis = detectBinaryValue(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectTime(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectBase64URL(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectBase64(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectHexadecimal(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectJSON(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectDatabaseCLITable(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectFixedWidthTable(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
@@ -392,6 +397,135 @@ enum ClipboardAnalyzer {
         analysis.set("UTC", formatTimestampUTC(date))
 
         return analysis
+    }
+
+    private static let binaryValueMaxUTF8Bytes = 1024
+
+    /// Bit patterns: `0`/`1` only, optional single-kind whitespace (` ` *or* `\t`) as byte separators; or contiguous with length ≥ 16 and multiple of 8.
+    private static func detectBinaryValue(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+        guard trimmed.utf8.count < binaryValueMaxUTF8Bytes else { return nil }
+        if trimmed.contains("\n") || trimmed.contains("\r") { return nil }
+
+        let hasSpace = trimmed.contains(" ")
+        let hasTab = trimmed.contains("\t")
+        if hasSpace && hasTab { return nil }
+        guard trimmed.unicodeScalars.allSatisfy({ s in
+            s == "0" || s == "1" || s == " " || s == "\t"
+        }) else { return nil }
+
+        var analysis = ClipboardAnalysis(dataType: .binaryValue)
+        addTextMetrics(to: &analysis, text: original)
+
+        if hasSpace || hasTab {
+            let separator: Character = hasSpace ? " " : "\t"
+            let parts = trimmed.split(whereSeparator: { $0 == separator }).map(String.init)
+            guard parts.count >= 2 else { return nil }
+            guard let first = parts.first,
+                  (1...8).contains(first.count),
+                  first.unicodeScalars.allSatisfy({ $0 == "0" || $0 == "1" }) else { return nil }
+            guard parts.dropFirst().allSatisfy({ p in
+                p.count == 8 && p.unicodeScalars.allSatisfy { $0 == "0" || $0 == "1" }
+            }) else { return nil }
+            guard let bytes = binaryDelimitedPartsToBytes(parts) else { return nil }
+            analysis.set("Hex Data", formatBinaryBytesAsHexSpaced(bytes))
+            if bytes.allSatisfy({ (32...126).contains($0) }) {
+                analysis.set("ASCII Data", String(decoding: bytes, as: UTF8.self))
+            }
+            return analysis
+        }
+
+        // Contiguous 0/1 only
+        guard trimmed.unicodeScalars.allSatisfy({ $0 == "0" || $0 == "1" }) else { return nil }
+        let bitCount = trimmed.count
+        if bitCount >= 16, bitCount.isMultiple(of: 8) {
+            guard let bytes = binaryContiguousToBytes(trimmed) else { return nil }
+            analysis.set("Hex Data", formatBinaryBytesAsHexSpaced(bytes))
+            if bytes.allSatisfy({ (32...126).contains($0) }) {
+                analysis.set("ASCII Data", String(decoding: bytes, as: UTF8.self))
+            }
+            return analysis
+        }
+
+        if bitCount <= 64, let intVal = binaryStringToUInt64(trimmed) {
+            analysis.set("Integer Value", "\(intVal)")
+        }
+        return analysis
+    }
+
+    private static func binaryDelimitedPartsToBytes(_ parts: [String]) -> [UInt8]? {
+        var out: [UInt8] = []
+        out.reserveCapacity(parts.count)
+        for p in parts {
+            guard let b = binaryChunkToUInt8(p) else { return nil }
+            out.append(b)
+        }
+        return out
+    }
+
+    private static func binaryContiguousToBytes(_ contiguous: String) -> [UInt8]? {
+        var out: [UInt8] = []
+        var idx = contiguous.startIndex
+        while idx < contiguous.endIndex {
+            let end = contiguous.index(idx, offsetBy: 8, limitedBy: contiguous.endIndex) ?? contiguous.endIndex
+            guard contiguous.distance(from: idx, to: end) == 8 else { return nil }
+            let chunk = String(contiguous[idx..<end])
+            guard let b = binaryChunkToUInt8(chunk) else { return nil }
+            out.append(b)
+            idx = end
+        }
+        return out
+    }
+
+    /// Interprets a 1…8 character `0`/`1` run as the least-significant bits of a byte (`1001000` → 0x48).
+    private static func binaryChunkToUInt8(_ chunk: String) -> UInt8? {
+        guard !chunk.isEmpty, chunk.count <= 8 else { return nil }
+        guard chunk.unicodeScalars.allSatisfy({ $0 == "0" || $0 == "1" }) else { return nil }
+        var v: UInt8 = 0
+        for ch in chunk.unicodeScalars {
+            v = (v << 1) | (ch == "1" ? 1 : 0)
+        }
+        return v
+    }
+
+    private static func binaryStringToUInt64(_ contiguous: String) -> UInt64? {
+        guard !contiguous.isEmpty, contiguous.count <= 64 else { return nil }
+        guard contiguous.unicodeScalars.allSatisfy({ $0 == "0" || $0 == "1" }) else { return nil }
+        var v: UInt64 = 0
+        for ch in contiguous.unicodeScalars {
+            v = (v << 1) | (ch == "1" ? 1 : 0)
+        }
+        return v
+    }
+
+    private static func formatBinaryBytesAsHexSpaced(_ bytes: [UInt8]) -> String {
+        bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+    }
+
+    /// Hexadecimal digit run (0-9, a-f after trim+lowercase), at least 4 characters, detected after Base64 so decodable payloads win.
+    /// Even lengths report byte count (half the length) and bit count (bytes × 8).
+    private static func detectHexadecimal(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+        let normalized = trimmed.lowercased()
+        guard normalized.count >= 4, isHexadecimalDigitString(normalized) else { return nil }
+
+        var analysis = ClipboardAnalysis(dataType: .hexadecimal)
+        addTextMetrics(to: &analysis, text: original)
+        if normalized.count.isMultiple(of: 2) {
+            let bytes = normalized.count / 2
+            analysis.set("Byte Count", "\(bytes)")
+            analysis.set("Bit Count", "\(bytes * 8)")
+        }
+        return analysis
+    }
+
+    /// ASCII `0-9` or `a-f` only (caller passes lowercased+trimmed input).
+    private static func isHexadecimalDigitString(_ lowercased: String) -> Bool {
+        for scalar in lowercased.unicodeScalars {
+            let v = scalar.value
+            let isDigit = v >= 0x30 && v <= 0x39
+            let isHexLetter = v >= 0x61 && v <= 0x66
+            guard isDigit || isHexLetter else { return false }
+        }
+        return true
     }
 
     private static func detectBase64URL(_ trimmed: String, original: String, maxLineLen: Int, previewMaxLines: Int) -> ClipboardAnalysis? {

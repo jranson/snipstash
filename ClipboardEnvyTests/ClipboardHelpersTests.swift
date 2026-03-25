@@ -2091,6 +2091,144 @@ final class ClipboardHelpersTests: XCTestCase {
         XCTAssertEqual(result, csv)
     }
 
+    // MARK: - Hexadecimal Value (analyzer)
+
+    func testAnalyzer_hexadecimal_evenLength_byteAndBitCounts() {
+        let analysis = ClipboardAnalyzer.analyze("DEADbeef")
+        XCTAssertEqual(analysis.dataType, .hexadecimal)
+        XCTAssertEqual(analysis["Byte Count"], "4")
+        XCTAssertEqual(analysis["Bit Count"], "32")
+    }
+
+    func testAnalyzer_hexadecimal_oddLength_omitsByteAndBitCounts() {
+        let analysis = ClipboardAnalyzer.analyze("deadbeef0")
+        XCTAssertEqual(analysis.dataType, .hexadecimal)
+        XCTAssertNil(analysis["Byte Count"])
+        XCTAssertNil(analysis["Bit Count"])
+    }
+
+    func testAnalyzer_hexadecimal_allHexLettersAF() {
+        let analysis = ClipboardAnalyzer.analyze("abcdef")
+        XCTAssertEqual(analysis.dataType, .hexadecimal)
+        XCTAssertEqual(analysis["Byte Count"], "3")
+        XCTAssertEqual(analysis["Bit Count"], "24")
+    }
+
+    func testAnalyzer_hexadecimal_rejectsLettersBeyondF() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("coffee").dataType, .generalText)
+    }
+
+    func testAnalyzer_hexadecimal_tooShortIsNotHexType() {
+        let analysis = ClipboardAnalyzer.analyze("abc")
+        XCTAssertEqual(analysis.dataType, .generalText)
+    }
+
+    func testAnalyzer_hexadecimal_mixedCaseNormalizes() {
+        let analysis = ClipboardAnalyzer.analyze("AbCdEf01")
+        XCTAssertEqual(analysis.dataType, .hexadecimal)
+        XCTAssertEqual(analysis["Byte Count"], "4")
+    }
+
+    func testAnalyzer_hexadecimal_rejectsNonAlphanumeric() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("abcd+ef").dataType, .generalText)
+        XCTAssertEqual(ClipboardAnalyzer.analyze("ab cd").dataType, .generalText)
+    }
+
+    func testAnalyzer_hexadecimal_base64DecodableRunsPreferBase64() {
+        // "Hello" without padding: still decodes as printable UTF-8 and matches Base64 before hex-style detection.
+        let analysis = ClipboardAnalyzer.analyze("SGVsbG8")
+        XCTAssertEqual(analysis.dataType, .base64)
+    }
+
+    // MARK: - Binary Value (analyzer)
+
+    func testAnalyzer_binaryValue_delimitedHello_hexAndAscii() {
+        let content = "1001000 01100101 01101100 01101100 01101111"
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertEqual(analysis["Hex Data"], "48 65 6C 6C 6F")
+        XCTAssertEqual(analysis["ASCII Data"], "Hello")
+    }
+
+    func testAnalyzer_binaryValue_delimitedWithTabs() {
+        let content = "1001000\t01100101\t01101100"
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertEqual(analysis["Hex Data"], "48 65 6C")
+        XCTAssertEqual(analysis["ASCII Data"], "Hel")
+    }
+
+    func testAnalyzer_binaryValue_contiguousSixteenBits_hexAndAscii() {
+        let content = "0100100001100101"
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertEqual(analysis["Hex Data"], "48 65")
+        XCTAssertEqual(analysis["ASCII Data"], "He")
+    }
+
+    func testAnalyzer_binaryValue_contiguousEightBits_integerOnlyNoHex() {
+        let analysis = ClipboardAnalyzer.analyze("00001010")
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertNil(analysis["Hex Data"])
+        XCTAssertNil(analysis["ASCII Data"])
+        XCTAssertEqual(analysis["Integer Value"], "10")
+    }
+
+    func testAnalyzer_binaryValue_nonSeriesShowsIntegerUpTo64Bits() {
+        let analysis = ClipboardAnalyzer.analyze("1010")
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertNil(analysis["Hex Data"])
+        XCTAssertEqual(analysis["Integer Value"], "10")
+    }
+
+    func testAnalyzer_binaryValue_nonSeriesOmitIntegerWhenOver64Digits() {
+        let bits = String(repeating: "1", count: 65)
+        let analysis = ClipboardAnalyzer.analyze(bits)
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertNil(analysis["Hex Data"])
+        XCTAssertNil(analysis["Integer Value"])
+    }
+
+    func testAnalyzer_binaryValue_rejectsMixedSpaceAndTab() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("1010\t 01010101").dataType, .generalText)
+    }
+
+    func testAnalyzer_binaryValue_rejectsNewline() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("10101010\n01010101").dataType, .generalText)
+    }
+
+    func testAnalyzer_binaryValue_rejectsDelimitedBadFirstTokenLength() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("100100000 01100101").dataType, .generalText)
+    }
+
+    func testAnalyzer_binaryValue_rejectsDelimitedShortFollowup() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("1001000 0110010").dataType, .generalText)
+    }
+
+    func testAnalyzer_binaryValue_rejectsDelimitedWhenSecondChunkNotEightBits() {
+        XCTAssertEqual(ClipboardAnalyzer.analyze("1010 0101").dataType, .generalText)
+    }
+
+    func testAnalyzer_binaryValue_nonPrintableBytesOmitAsciiData() {
+        let content = "00000000 00000001"
+        let analysis = ClipboardAnalyzer.analyze(content)
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertEqual(analysis["Hex Data"], "00 01")
+        XCTAssertNil(analysis["ASCII Data"])
+    }
+
+    func testAnalyzer_binaryValue_rejectsAt1024UTF8Bytes() {
+        let bits = String(repeating: "0", count: 1024)
+        let analysis = ClipboardAnalyzer.analyze(bits)
+        XCTAssertEqual(analysis.dataType, .hexadecimal)
+    }
+
+    func testAnalyzer_binaryValue_prefersBinaryOverHexForDigitsOnly() {
+        let analysis = ClipboardAnalyzer.analyze("10101010")
+        XCTAssertEqual(analysis.dataType, .binaryValue)
+        XCTAssertEqual(analysis["Integer Value"], "170")
+    }
+
     // MARK: - Testdata File Analysis Tests
 
     func testAnalyzer_csvFile() throws {
