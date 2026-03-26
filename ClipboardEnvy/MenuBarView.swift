@@ -505,7 +505,6 @@ struct MenuBarView: View {
                 Text("\(item.key): \(item.value)")
             }
             if !clipboardAnalysis.previewLines.isEmpty {
-                Divider()
                 Section("Preview") {
                     ForEach(Array(clipboardAnalysis.previewLines.enumerated()), id: \.offset) { _, line in
                         Text(line)
@@ -1043,12 +1042,10 @@ struct MenuBarView: View {
                     Button("→ Pipe-separated") { transformClipboard(ClipboardTransform.csvToPsv) }
                     Button("→ Fixed-Width Table") { transformClipboardIfValid(ClipboardTransform.csvToFixedWidthTable) }
                 }
-                Divider()
                 Section("Tab/Pipe-Separated") {
                     Button("TSV → CSV") { transformClipboardIfValid(ClipboardTransform.tsvToCsv) }
                     Button("PSV → CSV") { transformClipboardIfValid(ClipboardTransform.psvToCsv) }
                 }
-                Divider()
                 Section("Fixed-Width Table") {
                     Button("Table → CSV") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToCsv) }
                     Button("Table → JSON (typed)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJson) }
@@ -1059,7 +1056,6 @@ struct MenuBarView: View {
                     Button("Strip Empty Columns") { stripEmptyColumns() }
                 }
                 toggleVisibility(!showColumnsSection) {
-                    Divider()
                     Section("Columns") {
                         ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { columnIndex, columnName in
                             Menu(columnName.isEmpty ? "Column \(columnIndex + 1)" : columnName) {
@@ -1081,7 +1077,6 @@ struct MenuBarView: View {
                                     }
                                     let columnsAfter = Array(csvColumnHeaders.enumerated().dropFirst(columnIndex + 1).prefix(25))
                                     if !columnsAfter.isEmpty {
-                                        Divider()
                                         Section("Through") {
                                             ForEach(columnsAfter, id: \.offset) { targetIndex, targetName in
                                                 Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
@@ -1117,7 +1112,6 @@ struct MenuBarView: View {
                                         targetIndex != columnIndex + 1
                                     }
                                     if !validBeforeColumns.isEmpty {
-                                        Divider()
                                         Section("Before") {
                                             ForEach(Array(validBeforeColumns.prefix(26)), id: \.offset) { targetIndex, targetName in
                                                 Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
@@ -1175,7 +1169,6 @@ struct MenuBarView: View {
                     }
                     Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
                 }
-                Divider()
                 Section("Calculate Checksum") {
                     Button("MD5") { transformClipboard(ClipboardTransform.md5Checksum) }
                     Button("SHA-1") { transformClipboard(ClipboardTransform.sha1Checksum) }
@@ -1183,7 +1176,6 @@ struct MenuBarView: View {
                     Button("SHA-512") { transformClipboard(ClipboardTransform.sha512Checksum) }
                     Button("CRC32") { transformClipboard(ClipboardTransform.crc32) }
                 }
-                Divider()
                 Section("Hash Credentials") {
                     Button("Argon2id") { transformClipboardIfValid(ClipboardTransform.argon2idHash) }
                     Button("bcrypt") { transformClipboardIfValid(ClipboardTransform.bcryptHash) }
@@ -1250,36 +1242,26 @@ struct MenuBarView: View {
                 Divider()
                 Button("ULID") { setClipboardToRandomULID() }
                 Button("NanoID") { setClipboardToRandomNanoID() }
-                Divider()
                 Section("Hex Strings") {
                     Button("6 Bytes / 12 Chr") { setClipboardToRandomHex(byteCount: 6) }
                     Button("8 Bytes / 16 Chr") { setClipboardToRandomHex(byteCount: 8) }
                     Button("16 Bytes / 32 Chr") { setClipboardToRandomHex(byteCount: 16) }
                     Button("32 Bytes / 64 Chr") { setClipboardToRandomHex(byteCount: 32) }
                 }
-                Divider()
                 Section("Generate Password") {
                     Button("Very Complex") { setClipboardToRandomVeryComplexPassword() }
                     Button("Complex") { setClipboardToRandomComplexPassword() }
                     Button("Alphanumeric") { setClipboardToRandomAlphanumericPassword() }
                 }
             }
-            Menu("Filler") {
-                Button("Lorem Ipsum (Short)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderShort) }
-                Button("Lorem Ipsum (Medium)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderMedium) }
-                Button("Lorem Ipsum (Full)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderFull) }
-                Button("The Quick Brown Fox") { setClipboardTo(ClipboardSet.quickBrownFoxPlaceholder) }
-                Button("Pack My Box") { setClipboardTo(ClipboardSet.packMyBoxPlaceholder) }
-                Button("Sphinx of Black Quartz") { setClipboardTo(ClipboardSet.sphinxOfBlackQuartzPlaceholder) }
-                Button("Waltz, Bad Nymph") { setClipboardTo(ClipboardSet.waltzBadNymphPlaceholder) }
-                Button("Jackdaws") { setClipboardTo(ClipboardSet.jackdawsPlaceholder) }
-            }
-            Section("Symbols") {
+            Menu("Symbols") {
                 Menu("Typography") {
                     Button(symbolMenuLabel(symbol: "—", name: "Em dash")) { setClipboardTo("—") }
                     Button(symbolMenuLabel(symbol: "–", name: "En dash", padding: " ")) { setClipboardTo("–") }
                     Button(symbolMenuLabel(symbol: "…", name: "Ellipsis")) { setClipboardTo("…") }
                     Button(symbolMenuLabel(symbol: "¶", name: "Pilcrow")) { setClipboardTo("¶") }
+                    Button(symbolMenuLabel(symbol: "\\t", name: "Tab")) { setClipboardTo("\t") }
+                    Button(symbolMenuLabel(symbol: "\\n", name: "Newline")) { setClipboardTo("\n") }
                     Button(symbolMenuLabel(symbol: "\u{00A0}", name: "NBSP", padding: "  ")) { setClipboardTo("\u{00A0}") }
                 }
                 Menu("Keyboard") {
@@ -1387,19 +1369,31 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "¢", name: "Cent")) { setClipboardTo("¢") }
                 }
                 Menu("Table") {
-                    Button(symbolMenuLabel(symbol: "–", name: "Top/Bottom Border")) { setClipboardTo("─") }
-                    Button(symbolMenuLabel(symbol: " │ ", name: "Left/Right Border")) { setClipboardTo("│") }
-                    Button(symbolMenuLabel(symbol: "┌", name: "Upper Left Border")) { setClipboardTo("┌") }
-                    Button(symbolMenuLabel(symbol: "┬", name: "Upper Column Separator")) { setClipboardTo("┬") }
-                    Button(symbolMenuLabel(symbol: "┐", name: "Upper Right Border")) { setClipboardTo("┐") }
-                    Button(symbolMenuLabel(symbol: "└", name: "Lower Left Border")) { setClipboardTo("└") }
-                    Button(symbolMenuLabel(symbol: "┴", name: "Lower Column Separator")) { setClipboardTo("┴") }
-                    Button(symbolMenuLabel(symbol: "┘", name: "Lower Right Border")) { setClipboardTo("┘") }
+                    Section("ASCII Table") {
+                        Button(symbolMenuLabel(symbol: "–", name: "Top/Bottom Border")) { setClipboardTo("─") }
+                        Button(symbolMenuLabel(symbol: " │ ", name: "Left/Right Border")) { setClipboardTo("│") }
+                        Button(symbolMenuLabel(symbol: "┌", name: "Upper Left Border")) { setClipboardTo("┌") }
+                        Button(symbolMenuLabel(symbol: "┬", name: "Upper Column Sep")) { setClipboardTo("┬") }
+                        Button(symbolMenuLabel(symbol: "┐", name: "Upper Right Border")) { setClipboardTo("┐") }
+                        Button(symbolMenuLabel(symbol: "└", name: "Lower Left Border")) { setClipboardTo("└") }
+                        Button(symbolMenuLabel(symbol: "┴", name: "Lower Column Sep")) { setClipboardTo("┴") }
+                        Button(symbolMenuLabel(symbol: "┘", name: "Lower Right Border")) { setClipboardTo("┘") }
+                    }
                 }
+            }
+            Menu("Filler") {
+                Button("Lorem Ipsum (Short)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderShort) }
+                Button("Lorem Ipsum (Medium)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderMedium) }
+                Button("Lorem Ipsum (Full)") { setClipboardTo(ClipboardSet.loremIpsumPlaceholderFull) }
+                Button("The Quick Brown Fox") { setClipboardTo(ClipboardSet.quickBrownFoxPlaceholder) }
+                Button("Pack My Box") { setClipboardTo(ClipboardSet.packMyBoxPlaceholder) }
+                Button("Sphinx of Black Quartz") { setClipboardTo(ClipboardSet.sphinxOfBlackQuartzPlaceholder) }
+                Button("Waltz, Bad Nymph") { setClipboardTo(ClipboardSet.waltzBadNymphPlaceholder) }
+                Button("Jackdaws") { setClipboardTo(ClipboardSet.jackdawsPlaceholder) }
             }
             Divider()
             Menu("Test Data") {
-                Button("Text: The Tell-tale Heart") { setClipboardTo(TestData.plainText) }
+                Button("Text: The Tell-Tale Heart") { setClipboardTo(TestData.plainText) }
                 Button("Text List: Instruments") { setClipboardTo(TestData.instrumentsList) }
                 Button("Text: With Zero-Width Chrs") { setClipboardTo(TestData.zeroWidthSample) }
                 Divider()
