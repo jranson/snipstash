@@ -179,6 +179,18 @@ extension ClipboardTransform {
         return [1, 2, 5, 10, 25, 50]
     }
 
+    /// True when `multilineRemoveValues()` reads from the `RemoveLinesValues` user default instead of built-in defaults.
+    nonisolated static func multilineRemoveValuesAreUserConfigured() -> Bool {
+        let key = "RemoveLinesValues"
+        guard let stored = UserDefaults.standard.array(forKey: key) else { return false }
+        let ints: [Int] = stored.compactMap {
+            if let n = $0 as? Int { return n }
+            if let s = $0 as? String, let n = Int(s) { return n }
+            return nil
+        }.filter { $0 > 0 }
+        return !ints.isEmpty
+    }
+
     /// Returns the first `count` lines (like `head`).
     nonisolated static func headLines(_ s: String, count: Int) -> String {
         guard count > 0 else { return "" }

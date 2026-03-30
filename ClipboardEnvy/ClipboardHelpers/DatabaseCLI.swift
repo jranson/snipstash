@@ -138,56 +138,105 @@ extension ClipboardTransform {
     }
 
     /// ClickHouse client pretty tables use box-drawing characters (┌ ┬ ┐ │ └ ┘, ─).
+    /// Like the MySQL CLI parser, arbitrary text before/after the table is ignored once a valid header…footer block is found.
     nonisolated static func clickhouseCliTableRows(_ s: String) throws -> [[String]] {
         let lines = windowsNewlinesToUnix(s).components(separatedBy: .newlines)
         guard let (headerIdx, footerIdx) = clickhouseCliTableLineRange(lines) else {
             throw TransformError(description: "ClickHouse CLI Table → CSV failed: could not find a complete ┌…┐ header and └…┘ footer block.")
         }
 
-        let columnInfos = try parseClickHouseCliHeaderLine(lines[headerIdx])
+        let headerText = lines[headerIdx].trimmingCharacters(in: .whitespacesAndNewlines)
+        let columnInfos = try parseClickHouseCliHeaderLine(headerText)
         let columnCount = columnInfos.count
         guard columnCount > 0 else {
             throw TransformError(description: "ClickHouse CLI Table → CSV failed: header did not define any columns.")
         }
 
-        let dataLineIndices = (headerIdx + 1)..<footerIdx
-        let dataIndices = dataLineIndices.filter { clickhouseCliDataLine($0, lines: lines) }
-        guard !dataIndices.isEmpty else {
-            throw TransformError(description: "ClickHouse CLI Table → CSV failed: no data rows between header and footer.")
-        }
-
         var result: [[String]] = [columnInfos.map(\.name)]
         let trimBudgets = columnInfos.map(\.trailingSpaceTrim)
-        for idx in dataIndices {
-            guard let row = parseClickHouseCliDataRow(lines[idx], columnCount: columnCount, trailingSpaceTrim: trimBudgets) else {
+        for idx in (headerIdx + 1)..<footerIdx {
+            guard clickhouseCliIsProbableDataLine(lines[idx]) else { continue }
+            let trimmed = lines[idx].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let row = parseClickHouseCliDataRow(trimmed, columnCount: columnCount, trailingSpaceTrim: trimBudgets) else {
                 throw TransformError(description: "ClickHouse CLI Table → CSV failed: a data row could not be parsed or had the wrong number of columns.")
             }
             result.append(row)
         }
 
+        guard result.count >= 2 else {
+            throw TransformError(description: "ClickHouse CLI Table → CSV failed: no data rows between header and footer.")
+        }
         return result
     }
 
-    /// Returns header and footer line indices for the first ClickHouse-style table in `lines`.
+    /// Picks the first `┌…┬…┐` header, then the first `└…` grid footer after it that encloses at least one parsable data row (avoids mistaking an early or stray bottom rule when the client prints extra output between header and closing border).
     private nonisolated static func clickhouseCliTableLineRange(_ lines: [String]) -> (Int, Int)? {
-        guard let headerIdx = lines.firstIndex(where: { clickhouseCliIsHeaderLine($0) }) else { return nil }
-        guard let footerIdx = lines[headerIdx...].firstIndex(where: { clickhouseCliIsFooterLine($0) }),
-              footerIdx > headerIdx else { return nil }
-        return (headerIdx, footerIdx)
+        for h in lines.indices {
+            guard clickhouseCliIsHeaderLine(lines[h]) else { continue }
+            let headerText = lines[h].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let columnInfos = try? parseClickHouseCliHeaderLine(headerText), !columnInfos.isEmpty else { continue }
+            let columnCount = columnInfos.count
+            let trimBudgets = columnInfos.map(\.trailingSpaceTrim)
+            for f in lines[h...].indices where clickhouseCliIsFooterLine(lines[f]) {
+                guard f > h else { continue }
+                if clickhouseCliBlockContainsParsableData(
+                    lines: lines,
+                    headerIdx: h,
+                    footerIdx: f,
+                    columnCount: columnCount,
+                    trailingSpaceTrim: trimBudgets
+                ) {
+                    return (h, f)
+                }
+            }
+        }
+        return nil
+    }
+
+    private nonisolated static func clickhouseCliBlockContainsParsableData(
+        lines: [String],
+        headerIdx: Int,
+        footerIdx: Int,
+        columnCount: Int,
+        trailingSpaceTrim: [Int]
+    ) -> Bool {
+        for idx in (headerIdx + 1)..<footerIdx {
+            guard clickhouseCliIsProbableDataLine(lines[idx]) else { continue }
+            let trimmed = lines[idx].trimmingCharacters(in: .whitespacesAndNewlines)
+            if parseClickHouseCliDataRow(trimmed, columnCount: columnCount, trailingSpaceTrim: trailingSpaceTrim) != nil {
+                return true
+            }
+        }
+        return false
     }
 
     private nonisolated static func clickhouseCliIsHeaderLine(_ line: String) -> Bool {
-        line.contains("┌") && line.contains("┬") && line.contains("┐")
+        let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !t.isEmpty && t.contains("┌") && t.contains("┬") && t.contains("┐")
     }
 
+    /// Bottom border of the grid (not a stray “└” in prose).
     private nonisolated static func clickhouseCliIsFooterLine(_ line: String) -> Bool {
-        line.trimmingCharacters(in: .whitespaces).hasPrefix("└")
+        let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.hasPrefix("└"), t.count >= 2 else { return false }
+        return t.contains("─") || t.contains("┴") || t.contains("┘")
     }
 
-    private nonisolated static func clickhouseCliDataLine(_ idx: Int, lines: [String]) -> Bool {
-        let line = lines[idx]
-        // Data rows use │; ClickHouse may use ASCII | for left-aligned string columns alongside │ elsewhere.
-        return line.contains("│") || line.contains("|")
+    /// Row lines only: exclude header/footer reruns, horizontal rules, and box-only lines.
+    private nonisolated static func clickhouseCliIsProbableDataLine(_ line: String) -> Bool {
+        let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        if clickhouseCliIsHeaderLine(t) || clickhouseCliIsFooterLine(t) { return false }
+        if clickhouseCliIsIntermediateBoxLine(t) { return false }
+        return t.contains("│") || t.contains("|")
+    }
+
+    /// Horizontal dividers such as ├────┼────┤ (no “real” cell text).
+    private nonisolated static func clickhouseCliIsIntermediateBoxLine(_ line: String) -> Bool {
+        let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return true }
+        let boxOnly = Set<Character>("─│├┤┬┴┼└┘┌ ")
+        return t.allSatisfy { boxOnly.contains($0) }
     }
 
     private nonisolated static func parseClickHouseCliHeaderLine(_ line: String) throws -> [(name: String, trailingSpaceTrim: Int)] {

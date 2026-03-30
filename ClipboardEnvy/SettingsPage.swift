@@ -37,7 +37,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case splitJoin    = "Split / Join Menus"
     case textRemoves  = "Remove Text Menu"
     case textSwaps    = "Replace Text Menu"
-    case lineWrappers = "Wrap / Unwrap Lines Menu"
+    case lineWrappers = "Surround Lines Menu"
     case awkPatterns  = "Awk Lines Menu"
     case argon2       = "Argon2"
 

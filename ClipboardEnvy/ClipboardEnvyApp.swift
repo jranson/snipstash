@@ -9,6 +9,7 @@ import SwiftData
 @main
 struct ClipboardEnvyApp: App {
     @StateObject private var editorStore = EditorStore()
+    @StateObject private var customTransformStore = CustomTransformStore()
     @StateObject private var snippetsStore: SnippetsStore
 
     private static let sharedModelContainer: ModelContainer = {
@@ -43,6 +44,7 @@ struct ClipboardEnvyApp: App {
         MenuBarExtra(content: {
             MenuBarView()
                 .environmentObject(editorStore)
+                .environmentObject(customTransformStore)
                 .environmentObject(snippetsStore)
         }, label: {
             Image(nsImage: SnippetMenubarIcon.makeTemplateImage())
@@ -70,6 +72,13 @@ struct ClipboardEnvyApp: App {
             SettingsClipboardEnvyView()
         }
         .defaultSize(width: 780, height: 548)
+        .windowResizability(.contentSize)
+
+        Window("Custom Transform", id: "custom-transform") {
+            CustomTransformWindowRoot()
+                .environmentObject(customTransformStore)
+        }
+        .defaultSize(width: 420, height: 220)
         .windowResizability(.contentSize)
     }
 }

@@ -942,6 +942,28 @@ final class ClipboardHelpersTests: XCTestCase {
         }
     }
 
+    /// Like MySQL CLI: text before/after the box table and non-row lines inside the block are ignored.
+    func testClickHouseCliTableToCsv_toleratesNoiseAroundAndInsideBlock() throws {
+        let input = """
+        clickhouse-client --query 'SELECT 1'
+        Ok.
+
+            ┌─id─┬─lbl──────┐
+        elapsed: 0.001s
+            ├────┼──────────┤
+         1. │ 42 | hello    |
+            └───┴──────────┘
+
+        1 row in set. Elapsed: 0.001 sec.
+        """
+
+        let expected = """
+        id,lbl
+        42,hello
+        """
+        XCTAssertEqual(try ClipboardTransform.clickhouseCliTableToCsv(input), expected)
+    }
+
     func testSqlite3TableToCsv() throws {
         let input = """
         one      two
