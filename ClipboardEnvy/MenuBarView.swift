@@ -1343,38 +1343,38 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "²", name: "Squared")) { setClipboardTo("²") }
                     Button(symbolMenuLabel(symbol: "³", name: "Cubed")) { setClipboardTo("³") }
                     Divider()
-                    Button(symbolMenuLabel(symbol: "⁰", name: "Superscript 0")) { setClipboardTo("⁰") }
-                    Button(symbolMenuLabel(symbol: "ⁱ", name: "Superscript i")) { setClipboardTo("ⁱ") }
-                    Button(symbolMenuLabel(symbol: "¹", name: "Superscript 1")) { setClipboardTo("¹") }
-                    Button(symbolMenuLabel(symbol: "⁴", name: "Superscript 4")) { setClipboardTo("⁴") }
-                    Button(symbolMenuLabel(symbol: "⁵", name: "Superscript 5")) { setClipboardTo("⁵") }
-                    Button(symbolMenuLabel(symbol: "⁶", name: "Superscript 6")) { setClipboardTo("⁶") }
-                    Button(symbolMenuLabel(symbol: "⁷", name: "Superscript 7")) { setClipboardTo("⁷") }
-                    Button(symbolMenuLabel(symbol: "⁸", name: "Superscript 8")) { setClipboardTo("⁸") }
-                    Button(symbolMenuLabel(symbol: "⁹", name: "Superscript 9")) { setClipboardTo("⁹") }
-                    Button(symbolMenuLabel(symbol: "⁺", name: "Superscript +")) { setClipboardTo("⁺") }
-                    Button(symbolMenuLabel(symbol: "⁻", name: "Superscript -")) { setClipboardTo("⁻") }
-                    Button(symbolMenuLabel(symbol: "ⁿ", name: "Superscript n")) { setClipboardTo("ⁿ") }
-                    Button(symbolMenuLabel(symbol: "ª", name: "Superscript a")) { setClipboardTo("ª") }
+                    Button(symbolMenuLabel(symbol: "⁰", name: "Super 0")) { setClipboardTo("⁰") }
+                    Button(symbolMenuLabel(symbol: "¹", name: "Super 1")) { setClipboardTo("¹") }
+                    Button(symbolMenuLabel(symbol: "⁴", name: "Super 4")) { setClipboardTo("⁴") }
+                    Button(symbolMenuLabel(symbol: "⁵", name: "Super 5")) { setClipboardTo("⁵") }
+                    Button(symbolMenuLabel(symbol: "⁶", name: "Super 6")) { setClipboardTo("⁶") }
+                    Button(symbolMenuLabel(symbol: "⁷", name: "Super 7")) { setClipboardTo("⁷") }
+                    Button(symbolMenuLabel(symbol: "⁸", name: "Super 8")) { setClipboardTo("⁸") }
+                    Button(symbolMenuLabel(symbol: "⁹", name: "Super 9")) { setClipboardTo("⁹") }
+                    Button(symbolMenuLabel(symbol: "ⁱ", name: "Super i")) { setClipboardTo("ⁱ") }
+                    Button(symbolMenuLabel(symbol: "⁺", name: "Super +")) { setClipboardTo("⁺") }
+                    Button(symbolMenuLabel(symbol: "⁻", name: "Super -")) { setClipboardTo("⁻") }
+                    Button(symbolMenuLabel(symbol: "ⁿ", name: "Super n")) { setClipboardTo("ⁿ") }
+                    Button(symbolMenuLabel(symbol: "ª", name: "Super a")) { setClipboardTo("ª") }
                 }
                 Menu("Subscript") {
-                    Button(symbolMenuLabel(symbol: "₀", name: "Subscript 0")) { setClipboardTo("₀") }
-                    Button(symbolMenuLabel(symbol: "₁", name: "Subscript 1")) { setClipboardTo("₁") }
-                    Button(symbolMenuLabel(symbol: "₂", name: "Subscript 2")) { setClipboardTo("₂") }
-                    Button(symbolMenuLabel(symbol: "₃", name: "Subscript 3")) { setClipboardTo("₃") }
-                    Button(symbolMenuLabel(symbol: "₄", name: "Subscript 4")) { setClipboardTo("₄") }
-                    Button(symbolMenuLabel(symbol: "₅", name: "Subscript 5")) { setClipboardTo("₅") }
-                    Button(symbolMenuLabel(symbol: "₆", name: "Subscript 6")) { setClipboardTo("₆") }
-                    Button(symbolMenuLabel(symbol: "₇", name: "Subscript 7")) { setClipboardTo("₇") }
-                    Button(symbolMenuLabel(symbol: "₈", name: "Subscript 8")) { setClipboardTo("₈") }
-                    Button(symbolMenuLabel(symbol: "₉", name: "Subscript 9")) { setClipboardTo("₉") }
-                    Button(symbolMenuLabel(symbol: "₊", name: "Subscript +")) { setClipboardTo("₊") }
-                    Button(symbolMenuLabel(symbol: "₋", name: "Subscript -")) { setClipboardTo("₋") }
-                    Button(symbolMenuLabel(symbol: "ₐ", name: "Subscript a")) { setClipboardTo("ₐ") }
-                    Button(symbolMenuLabel(symbol: "ₑ", name: "Subscript e")) { setClipboardTo("ₑ") }
-                    Button(symbolMenuLabel(symbol: "ₒ", name: "Subscript o")) { setClipboardTo("ₒ") }
-                    Button(symbolMenuLabel(symbol: "ₓ", name: "Subscript x")) { setClipboardTo("ₓ") }
-                    Button(symbolMenuLabel(symbol: "ₔ", name: "Subscript ə")) { setClipboardTo("ₔ") }
+                    Button(symbolMenuLabel(symbol: "₀", name: "Sub 0")) { setClipboardTo("₀") }
+                    Button(symbolMenuLabel(symbol: "₁", name: "Sub 1")) { setClipboardTo("₁") }
+                    Button(symbolMenuLabel(symbol: "₂", name: "Sub 2")) { setClipboardTo("₂") }
+                    Button(symbolMenuLabel(symbol: "₃", name: "Sub 3")) { setClipboardTo("₃") }
+                    Button(symbolMenuLabel(symbol: "₄", name: "Sub 4")) { setClipboardTo("₄") }
+                    Button(symbolMenuLabel(symbol: "₅", name: "Sub 5")) { setClipboardTo("₅") }
+                    Button(symbolMenuLabel(symbol: "₆", name: "Sub 6")) { setClipboardTo("₆") }
+                    Button(symbolMenuLabel(symbol: "₇", name: "Sub 7")) { setClipboardTo("₇") }
+                    Button(symbolMenuLabel(symbol: "₈", name: "Sub 8")) { setClipboardTo("₈") }
+                    Button(symbolMenuLabel(symbol: "₉", name: "Sub 9")) { setClipboardTo("₉") }
+                    Button(symbolMenuLabel(symbol: "₊", name: "Sub +")) { setClipboardTo("₊") }
+                    Button(symbolMenuLabel(symbol: "₋", name: "Sub -")) { setClipboardTo("₋") }
+                    Button(symbolMenuLabel(symbol: "ₐ", name: "Sub a")) { setClipboardTo("ₐ") }
+                    Button(symbolMenuLabel(symbol: "ₑ", name: "Sub e")) { setClipboardTo("ₑ") }
+                    Button(symbolMenuLabel(symbol: "ₒ", name: "Sub o")) { setClipboardTo("ₒ") }
+                    Button(symbolMenuLabel(symbol: "ₓ", name: "Sub x")) { setClipboardTo("ₓ") }
+                    Button(symbolMenuLabel(symbol: "ₔ", name: "Sub ə")) { setClipboardTo("ₔ") }
                 }
                 Menu("Fractions") {
                     Button(symbolMenuLabel(symbol: "⅛", name: "1/8")) { setClipboardTo("⅛") }
