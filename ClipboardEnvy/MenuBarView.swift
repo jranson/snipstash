@@ -110,7 +110,7 @@ struct MenuBarView: View {
 
     private var encodeHashMenuLabel: String {
         TransformMenuTitles.appendSparkleIf(
-            "Encode / Hash",
+            "Encode",
             condition: !shouldShowAll && (
                 clipboardAnalysis.dataType == .jwt ||
                 clipboardAnalysis.dataType == .base64 ||
@@ -1178,6 +1178,8 @@ struct MenuBarView: View {
                     }
                     Button("Decode Header") { transformClipboardIfValid(ClipboardTransform.jwtDecodeHeader) }
                 }
+            }
+            Menu("Hash") {
                 Section("Calculate Checksum") {
                     Button("MD5") { transformClipboard(ClipboardTransform.md5Checksum) }
                     Button("SHA-1") { transformClipboard(ClipboardTransform.sha1Checksum) }
@@ -1508,7 +1510,7 @@ struct MenuBarView: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
-        Button("Clipboard → New Snippet", action: quickSaveFromClipboard)
+        Button("Clipboard → Snippet", action: quickSaveFromClipboard)
             .modifierKeyAlternate(.option) {
                 Button("Clipboard → New Editor") {
                     openNewEditorFromClipboard()
