@@ -14,6 +14,7 @@ struct MenuBarView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openWindow) private var openWindow
     @EnvironmentObject private var editorStore: EditorStore
+    @EnvironmentObject private var customTransformStore: CustomTransformStore
     @EnvironmentObject private var snippetsStore: SnippetsStore
     @AppStorage("muteQuickSaveSounds") private var muteSounds = false
     @AppStorage("demoMenuEnabled") private var demoMenuEnabled = false
@@ -615,7 +616,18 @@ struct MenuBarView: View {
                                     ClipboardTransform.removeSubstring($0, target: item.target)
                                 }
                             }
+                            .help(item.target)
                         }
+                    }
+                    Divider()
+                    Button("Custom...") {
+                        openCustomTransform(
+                            title: "Remove Substring",
+                            fields: [.init(label: "Substring to remove", placeholder: "e.g. ,")],
+                            transform: { text, values in
+                                ClipboardTransform.removeSubstring(text, target: values[0])
+                            }
+                        )
                     }
                 }
                 Menu("Replace") {
@@ -686,7 +698,21 @@ struct MenuBarView: View {
                                     ClipboardTransform.swapSubstrings($0, from: item.from, to: item.to)
                                 }
                             }
+                            .help("from: \(item.from), to: \(item.to)")
                         }
+                    }
+                    Divider()
+                    Button("Custom...") {
+                        openCustomTransform(
+                            title: "Replace Text",
+                            fields: [
+                                .init(label: "Find", placeholder: "e.g. foo"),
+                                .init(label: "Replace with", placeholder: "e.g. bar"),
+                            ],
+                            transform: { text, values in
+                                ClipboardTransform.swapSubstrings(text, from: values[0], to: values[1])
+                            }
+                        )
                     }
                 }
                 Menu("Split to Lines") {
@@ -707,8 +733,19 @@ struct MenuBarView: View {
                                         ClipboardTransform.splitLines(on: item.delimiter, $0)
                                     }
                                 }
+                                .help(item.delimiter)
                             }
                         }
+                    }
+                    Divider()
+                    Button("Custom...") {
+                        openCustomTransform(
+                            title: "Split to Lines",
+                            fields: [.init(label: "Split on", placeholder: "e.g. ,")],
+                            transform: { text, values in
+                                ClipboardTransform.splitLines(on: values[0], text)
+                            }
+                        )
                     }
                 }
             }
@@ -773,7 +810,6 @@ struct MenuBarView: View {
             Menu("Multiline") {
                 let includeFilters = ClipboardTransform.customMultilineIncludeFilters()
                 let excludeFilters = ClipboardTransform.customMultilineExcludeFilters()
-                let hasAnyLineFilters = !includeFilters.isEmpty || !excludeFilters.isEmpty
                 Menu("Sort") {
                     Section("Sort Lines") {
                         Button("Reverse Order") { transformClipboard(ClipboardTransform.reverseLines) }
@@ -784,33 +820,51 @@ struct MenuBarView: View {
                     }
                 }
                 Divider()
-                if hasAnyLineFilters {
-                    Menu("Filter") {
+                Menu("Filter") {
+                    Menu("Include") {
                         if !includeFilters.isEmpty {
-                            Menu("Include") {
-                                Section("Lines With") {
-                                    ForEach(includeFilters, id: \.label) { item in
-                                        Button(item.label) {
-                                            transformClipboard {
-                                                ClipboardTransform.includeLinesContaining($0, filter: item.filter)
-                                            }
+                            Section("Lines With") {
+                                ForEach(includeFilters, id: \.label) { item in
+                                    Button(item.label) {
+                                        transformClipboard {
+                                            ClipboardTransform.includeLinesContaining($0, filter: item.filter)
                                         }
                                     }
                                 }
                             }
+                            Divider()
                         }
+                        Button("Custom...") {
+                            openCustomTransform(
+                                title: "Filter: Include Lines",
+                                fields: [.init(label: "Keep lines containing", placeholder: "e.g. error")],
+                                transform: { text, values in
+                                    ClipboardTransform.includeLinesContaining(text, filter: values[0])
+                                }
+                            )
+                        }
+                    }
+                    Menu("Exclude") {
                         if !excludeFilters.isEmpty {
-                            Menu("Exclude") {
-                                Section("Lines With") {
-                                    ForEach(excludeFilters, id: \.label) { item in
-                                        Button(item.label) {
-                                            transformClipboard {
-                                                ClipboardTransform.excludeLinesContaining($0, filter: item.filter)
-                                            }
+                            Section("Lines With") {
+                                ForEach(excludeFilters, id: \.label) { item in
+                                    Button(item.label) {
+                                        transformClipboard {
+                                            ClipboardTransform.excludeLinesContaining($0, filter: item.filter)
                                         }
                                     }
                                 }
                             }
+                            Divider()
+                        }
+                        Button("Custom...") {
+                            openCustomTransform(
+                                title: "Filter: Exclude Lines",
+                                fields: [.init(label: "Remove lines containing", placeholder: "e.g. debug")],
+                                transform: { text, values in
+                                    ClipboardTransform.excludeLinesContaining(text, filter: values[0])
+                                }
+                            )
                         }
                     }
                 }
@@ -828,6 +882,7 @@ struct MenuBarView: View {
                     Section("Remove Lines") {
                         Divider()
                         let counts = ClipboardTransform.multilineRemoveValues()
+                        let removeLineCountsFromUserPrefs = ClipboardTransform.multilineRemoveValuesAreUserConfigured()
                         ForEach(counts, id: \.self) { n in
                             let label = "First \(n)"
                             Button(label) {
@@ -840,6 +895,7 @@ struct MenuBarView: View {
                             Button(label) {
                                 transformClipboard { ClipboardTransform.removeLastLines($0, count: n) }
                             }
+                            .optionalMenuHelp(removeLineCountsFromUserPrefs, "removeLastLines(count: \(n))")
                         }
                     }
                 }
@@ -895,6 +951,15 @@ struct MenuBarView: View {
                         }
                     }
                     Divider()
+                    Button("Custom...") {
+                        openCustomTransform(
+                            title: "Join Lines",
+                            fields: [.init(label: "Join lines with", placeholder: "e.g. ,")],
+                            transform: { text, values in
+                                ClipboardTransform.joinLines(text, delimiter: values[0])
+                            }
+                        )
+                    }
                 }
 
                 Menu("Awk") {
@@ -914,6 +979,7 @@ struct MenuBarView: View {
                                     ClipboardTransform.awk(input, command: pattern.command)
                                 }
                             }
+                            .help(pattern.command)
                         }
                     }
                 }
@@ -975,6 +1041,7 @@ struct MenuBarView: View {
                                         ClipboardTransform.wrapLines($0, prefix: item.prefix, suffix: item.suffix)
                                     }
                                 }
+                                .help("\(item.prefix)|\(item.suffix)")
                             }
                         }
                     }
@@ -1051,79 +1118,21 @@ struct MenuBarView: View {
                     Button("Table → JSON (typed)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJson) }
                     Button("Table → JSON (strings)") { transformClipboardIfValid(ClipboardTransform.fixedWidthTableToJsonStrings) }
                 }
-                toggleVisibility(!showStripColumns) {
+                if(showStripColumns) {
                     Divider()
                     Button("Strip Empty Columns") { stripEmptyColumns() }
                 }
-                toggleVisibility(!showColumnsSection) {
+                if showColumnsSection {
+                    Divider()
+                        // ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { columnIndex, columnName in
                     Section("Columns") {
-                        ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { columnIndex, columnName in
-                            Menu(columnName.isEmpty ? "Column \(columnIndex + 1)" : columnName) {
-                                // Sort button
-                                Button("Sort By") {
-                                    sortByColumn(columnIndex: columnIndex)
-                                }
-                                Divider()
-                                // Remove button
-                                Button("Remove") {
-                                    removeColumn(columnIndex: columnIndex)
-                                }
-                                .disabled(csvColumnHeaders.count <= 1)
-                                // Extract submenu
-                                Divider()
-                                Menu("Extract") {
-                                    Button("This Column") {
-                                        extractColumns(fromIndex: columnIndex, toIndex: columnIndex)
-                                    }
-                                    let columnsAfter = Array(csvColumnHeaders.enumerated().dropFirst(columnIndex + 1).prefix(25))
-                                    if !columnsAfter.isEmpty {
-                                        Section("Through") {
-                                            ForEach(columnsAfter, id: \.offset) { targetIndex, targetName in
-                                                Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
-                                                    extractColumns(fromIndex: columnIndex, toIndex: targetIndex)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                // Swap submenu
-                                Menu("Swap") {
-                                    ForEach(Array(csvColumnHeaders.enumerated().prefix(26)), id: \.offset) { targetIndex, targetName in
-                                        if targetIndex != columnIndex {
-                                            Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
-                                                swapColumns(indexA: columnIndex, indexB: targetIndex)
-                                            }
-                                        }
-                                    }
-                                }
-                                // Move submenu
-                                Menu("Move") {
-                                    Button("To the Start") {
-                                        moveColumnToStart(fromIndex: columnIndex)
-                                    }
-                                    .disabled(columnIndex == 0)
-                                    Button("To the End") {
-                                        moveColumnToEnd(fromIndex: columnIndex)
-                                    }
-                                    .disabled(columnIndex == csvColumnHeaders.count - 1)
-                                    let validBeforeColumns = csvColumnHeaders.enumerated().filter { targetIndex, _ in
-                                        targetIndex != 0 &&
-                                        targetIndex != columnIndex &&
-                                        targetIndex != columnIndex + 1
-                                    }
-                                    if !validBeforeColumns.isEmpty {
-                                        Section("Before") {
-                                            ForEach(Array(validBeforeColumns.prefix(26)), id: \.offset) { targetIndex, targetName in
-                                                Button(targetName.isEmpty ? "Column \(targetIndex + 1)" : targetName) {
-                                                    moveColumnBefore(fromIndex: columnIndex, beforeIndex: targetIndex)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        Menu("Test 2") {
+                            Button("Test Item") { stripEmptyColumns() }
                         }
+                        Button("Test Item") { stripEmptyColumns() }
                     }
+
+                        // }
                 }
             }
             Menu(databaseCLIMenuLabel) {
@@ -1260,6 +1269,13 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "–", name: "En dash", padding: " ")) { setClipboardTo("–") }
                     Button(symbolMenuLabel(symbol: "…", name: "Ellipsis")) { setClipboardTo("…") }
                     Button(symbolMenuLabel(symbol: "¶", name: "Pilcrow")) { setClipboardTo("¶") }
+                    Button(symbolMenuLabel(symbol: "‖", name: "Bars")) { setClipboardTo("‖") }
+                    Divider()
+                    Button(symbolMenuLabel(symbol: "†", name: "Dagger")) { setClipboardTo("†") }
+                    Button(symbolMenuLabel(symbol: "‡", name: "Dagger 2")) { setClipboardTo("‡") }
+                    Button(symbolMenuLabel(symbol: "☞", name: "Manicule")) { setClipboardTo("†") }
+                    Button(symbolMenuLabel(symbol: "◊", name: "Lozenge")) { setClipboardTo("‡") }
+                    Divider()
                     Button(symbolMenuLabel(symbol: "\\t", name: "Tab")) { setClipboardTo("\t") }
                     Button(symbolMenuLabel(symbol: "\\n", name: "Newline")) { setClipboardTo("\n") }
                     Button(symbolMenuLabel(symbol: "\u{00A0}", name: "NBSP", padding: "  ")) { setClipboardTo("\u{00A0}") }
@@ -1299,12 +1315,13 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "★", name: "Filled Star")) { setClipboardTo("★") }
                     Button(symbolMenuLabel(symbol: "☆", name: "Open Star")) { setClipboardTo("☆") }
                 }
+                Menu("Legal") {
+                    Button(symbolMenuLabel(symbol: "©", name: "Copyright")) { setClipboardTo("©") }
+                    Button(symbolMenuLabel(symbol: "®", name: "Registered")) { setClipboardTo("®") }
+                    Button(symbolMenuLabel(symbol: "™", name: "Trademark")) { setClipboardTo("™") }
+                    Button(symbolMenuLabel(symbol: "§", name: "Section", padding: " ")) { setClipboardTo("§") }
+                }
                 Menu("Math") {
-                    Button(symbolMenuLabel(symbol: "²", name: "Squared")) { setClipboardTo("²") }
-                    Button(symbolMenuLabel(symbol: "³", name: "Cubed")) { setClipboardTo("³") }
-                    Button(symbolMenuLabel(symbol: "₂", name: "Subscript 2")) { setClipboardTo("₂") }
-                    Button(symbolMenuLabel(symbol: "₃", name: "Subscript 3")) { setClipboardTo("₃") }
-                    Divider()
                     Button(symbolMenuLabel(symbol: "±", name: "Plus-minus")) { setClipboardTo("±") }
                     Button(symbolMenuLabel(symbol: "×", name: "Multiply")) { setClipboardTo("×") }
                     Button(symbolMenuLabel(symbol: "÷", name: "Divide")) { setClipboardTo("÷") }
@@ -1315,12 +1332,70 @@ struct MenuBarView: View {
                     Button(symbolMenuLabel(symbol: "≥", name: "Greater-or-equal")) { setClipboardTo("≥") }
                     Divider()
                     Button(symbolMenuLabel(symbol: "∞", name: "Infinity")) { setClipboardTo("∞") }
+                    Divider()
+                    Button(symbolMenuLabel(symbol: "√", name: "Square Root")) { setClipboardTo("√") }
+                    Button(symbolMenuLabel(symbol: "∛", name: "Cube Root")) { setClipboardTo("∛") }
+                    Button(symbolMenuLabel(symbol: "∜", name: "Fourth Root")) { setClipboardTo("∜") }
                 }
-                Menu("Legal") {
-                    Button(symbolMenuLabel(symbol: "©", name: "Copyright")) { setClipboardTo("©") }
-                    Button(symbolMenuLabel(symbol: "®", name: "Registered")) { setClipboardTo("®") }
-                    Button(symbolMenuLabel(symbol: "™", name: "Trademark")) { setClipboardTo("™") }
-                    Button(symbolMenuLabel(symbol: "§", name: "Section", padding: " ")) { setClipboardTo("§") }
+                Menu("Superscript") {
+                    Button(symbolMenuLabel(symbol: "²", name: "Squared")) { setClipboardTo("²") }
+                    Button(symbolMenuLabel(symbol: "³", name: "Cubed")) { setClipboardTo("³") }
+                    Divider()
+                    Button(symbolMenuLabel(symbol: "⁰", name: "Superscript 0")) { setClipboardTo("⁰") }
+                    Button(symbolMenuLabel(symbol: "ⁱ", name: "Superscript i")) { setClipboardTo("ⁱ") }
+                    Button(symbolMenuLabel(symbol: "¹", name: "Superscript 1")) { setClipboardTo("¹") }
+                    Button(symbolMenuLabel(symbol: "⁴", name: "Superscript 4")) { setClipboardTo("⁴") }
+                    Button(symbolMenuLabel(symbol: "⁵", name: "Superscript 5")) { setClipboardTo("⁵") }
+                    Button(symbolMenuLabel(symbol: "⁶", name: "Superscript 6")) { setClipboardTo("⁶") }
+                    Button(symbolMenuLabel(symbol: "⁷", name: "Superscript 7")) { setClipboardTo("⁷") }
+                    Button(symbolMenuLabel(symbol: "⁸", name: "Superscript 8")) { setClipboardTo("⁸") }
+                    Button(symbolMenuLabel(symbol: "⁹", name: "Superscript 9")) { setClipboardTo("⁹") }
+                    Button(symbolMenuLabel(symbol: "⁺", name: "Superscript +")) { setClipboardTo("⁺") }
+                    Button(symbolMenuLabel(symbol: "⁻", name: "Superscript -")) { setClipboardTo("⁻") }
+                    Button(symbolMenuLabel(symbol: "ⁿ", name: "Superscript n")) { setClipboardTo("ⁿ") }
+                    Button(symbolMenuLabel(symbol: "ª", name: "Superscript a")) { setClipboardTo("ª") }
+                }
+                Menu("Subscript") {
+                    Button(symbolMenuLabel(symbol: "₀", name: "Subscript 0")) { setClipboardTo("₀") }
+                    Button(symbolMenuLabel(symbol: "₁", name: "Subscript 1")) { setClipboardTo("₁") }
+                    Button(symbolMenuLabel(symbol: "₂", name: "Subscript 2")) { setClipboardTo("₂") }
+                    Button(symbolMenuLabel(symbol: "₃", name: "Subscript 3")) { setClipboardTo("₃") }
+                    Button(symbolMenuLabel(symbol: "₄", name: "Subscript 4")) { setClipboardTo("₄") }
+                    Button(symbolMenuLabel(symbol: "₅", name: "Subscript 5")) { setClipboardTo("₅") }
+                    Button(symbolMenuLabel(symbol: "₆", name: "Subscript 6")) { setClipboardTo("₆") }
+                    Button(symbolMenuLabel(symbol: "₇", name: "Subscript 7")) { setClipboardTo("₇") }
+                    Button(symbolMenuLabel(symbol: "₈", name: "Subscript 8")) { setClipboardTo("₈") }
+                    Button(symbolMenuLabel(symbol: "₉", name: "Subscript 9")) { setClipboardTo("₉") }
+                    Button(symbolMenuLabel(symbol: "₊", name: "Subscript +")) { setClipboardTo("₊") }
+                    Button(symbolMenuLabel(symbol: "₋", name: "Subscript -")) { setClipboardTo("₋") }
+                    Button(symbolMenuLabel(symbol: "ₐ", name: "Subscript a")) { setClipboardTo("ₐ") }
+                    Button(symbolMenuLabel(symbol: "ₑ", name: "Subscript e")) { setClipboardTo("ₑ") }
+                    Button(symbolMenuLabel(symbol: "ₒ", name: "Subscript o")) { setClipboardTo("ₒ") }
+                    Button(symbolMenuLabel(symbol: "ₓ", name: "Subscript x")) { setClipboardTo("ₓ") }
+                    Button(symbolMenuLabel(symbol: "ₔ", name: "Subscript ə")) { setClipboardTo("ₔ") }
+                }
+                Menu("Fractions") {
+                    Button(symbolMenuLabel(symbol: "⅛", name: "1/8")) { setClipboardTo("⅛") }
+                    Button(symbolMenuLabel(symbol: "¼", name: "1/4")) { setClipboardTo("¼") }
+                    Button(symbolMenuLabel(symbol: "⅜", name: "3/8")) { setClipboardTo("⅜") }
+                    Button(symbolMenuLabel(symbol: "½", name: "1/2")) { setClipboardTo("½") }
+                    Button(symbolMenuLabel(symbol: "⅝", name: "5/8")) { setClipboardTo("⅝") }
+                    Button(symbolMenuLabel(symbol: "¾", name: "3/4")) { setClipboardTo("¾") }
+                    Button(symbolMenuLabel(symbol: "⅞", name: "7/8")) { setClipboardTo("⅞") }
+                    Divider()
+                    Button(symbolMenuLabel(symbol: "⅙", name: "1/6")) { setClipboardTo("⅙") }
+                    Button(symbolMenuLabel(symbol: "⅓", name: "1/3")) { setClipboardTo("⅓") }
+                    Button(symbolMenuLabel(symbol: "⅔", name: "2/3")) { setClipboardTo("⅔") }
+                    Button(symbolMenuLabel(symbol: "⅚", name: "5/6")) { setClipboardTo("⅚") }
+                    Divider()
+                    Button(symbolMenuLabel(symbol: "⅕", name: "1/5")) { setClipboardTo("⅕") }
+                    Button(symbolMenuLabel(symbol: "⅖", name: "2/5")) { setClipboardTo("⅖") }
+                    Button(symbolMenuLabel(symbol: "⅗", name: "3/5")) { setClipboardTo("⅗") }
+                    Button(symbolMenuLabel(symbol: "⅘", name: "4/5")) { setClipboardTo("⅘") }
+                    Divider()
+                    Button(symbolMenuLabel(symbol: "⅐", name: "1/7")) { setClipboardTo("⅐") }
+                    Button(symbolMenuLabel(symbol: "⅑", name: "1/9")) { setClipboardTo("⅑") }
+                    Button(symbolMenuLabel(symbol: "⅒", name: "1/10")) { setClipboardTo("⅒") }
                 }
                 Menu("Arrows") {
                     Button(symbolMenuLabel(symbol: "→", name: "Right")) { setClipboardTo("→") }
@@ -1536,6 +1611,18 @@ struct MenuBarView: View {
         editorStore.editingSnippet = nil
         editorStore.newSnippetEditorSession &+= 1
         openWindow(id: "editor")
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private func openCustomTransform(
+        title: String,
+        fields: [CustomTransformStore.FieldDefinition],
+        transform: @escaping (String, [String]) -> String
+    ) {
+        customTransformStore.request(title: title, fields: fields, transform: transform)
+        openWindow(id: "custom-transform")
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -2011,6 +2098,26 @@ struct MenuBarView: View {
         if text.count <= limit { return text }
         let idx = text.index(text.startIndex, offsetBy: limit)
         return String(text[..<idx]) + "…"
+    }
+}
+
+private struct OptionalMenuHelp: ViewModifier {
+    let active: Bool
+    let message: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if active {
+            content.help(message)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    fileprivate func optionalMenuHelp(_ active: Bool, _ message: String) -> some View {
+        modifier(OptionalMenuHelp(active: active, message: message))
     }
 }
 

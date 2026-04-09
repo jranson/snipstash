@@ -460,7 +460,7 @@ struct SettingsClipboardEnvyView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .frame(width: 780, height: 548)
+        .frame(width: 780, height: 588)
         .background(WindowConfigurator())
         .onKeyPress(.escape) {
             closeSettingsWindow()
@@ -498,14 +498,61 @@ private struct GeneralSettingsView: View {
     @AppStorage("snippetMenuLabelMaxChars") private var snippetMenuLabelMaxChars = 36
     @AppStorage("clipboardPreviewMaxLines") private var clipboardPreviewMaxLines = 5
 
+    @State private var openAtLoginOn = LaunchAtLogin.isSetToOpenAtLogin
+    @State private var openAtLoginNeedsApproval = LaunchAtLogin.needsApprovalInSystemSettings
+    @State private var openAtLoginError: String?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 SectionTitle(title: "General")
 
                 SettingsCard {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Launch \(BuildInfo.appName) on Startup")
+                                    .font(.system(size: 14))
+                                Text("Opens automatically when you sign in to this Mac. You can also change this in System Settings → General → Login Items.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Toggle("", isOn: openAtLoginToggleBinding)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+
+                        if openAtLoginNeedsApproval {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Enable \(BuildInfo.appName) in Login Items to finish.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Button("Open Login Items…") {
+                                    LaunchAtLogin.openSystemLoginItemsPane()
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                        }
+
+                        if let openAtLoginError {
+                            Text(openAtLoginError)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                        }
+                    }
+                }
+
+                SettingsCard {
                     VStack(spacing: 0) {
-                        Argon2Row(
+                        SettingsRow(
                             label: "Recent Snippets in Menu",
                             description: "Number of recent snippets shown in the menu. Default: 10",
                             value: $recentSnippetsMenuCount,
@@ -513,7 +560,7 @@ private struct GeneralSettingsView: View {
                             step: 1
                         )
                         Divider().padding(.leading, 16)
-                        Argon2Row(
+                        SettingsRow(
                             label: "Snippet Menu Label Max Length",
                             description: "Max characters before truncation with an ellipsis. Default: 36",
                             value: $snippetMenuLabelMaxChars,
@@ -521,7 +568,7 @@ private struct GeneralSettingsView: View {
                             step: 1
                         )
                         Divider().padding(.leading, 16)
-                        Argon2Row(
+                        SettingsRow(
                             label: "Clipboard Analysis Preview Lines",
                             description: "Number of Preview lines shown in the Clipboard Data Analysis menu. Default: 5",
                             value: $clipboardPreviewMaxLines,
@@ -530,9 +577,6 @@ private struct GeneralSettingsView: View {
                         )
                     }
                 }
-
-                Spacer()
-                Spacer()
 
                 VStack(alignment: .leading, spacing: 8) {
                     tipRow(
@@ -545,6 +589,12 @@ private struct GeneralSettingsView: View {
             .padding(.top, 12)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onAppear {
+            refreshOpenAtLoginFromSystem()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshOpenAtLoginFromSystem()
         }
         .onChange(of: recentSnippetsMenuCount) { _, v in
             let clamped = min(max(v, Self.recentSnippetsMenuCountRange.lowerBound), Self.recentSnippetsMenuCountRange.upperBound)
@@ -564,6 +614,26 @@ private struct GeneralSettingsView: View {
                 clipboardPreviewMaxLines = clamped
             }
         }
+    }
+
+    private var openAtLoginToggleBinding: Binding<Bool> {
+        Binding(
+            get: { openAtLoginOn },
+            set: { newValue in
+                openAtLoginError = nil
+                do {
+                    try LaunchAtLogin.setOpenAtLogin(newValue)
+                } catch {
+                    openAtLoginError = error.localizedDescription
+                }
+                refreshOpenAtLoginFromSystem()
+            }
+        )
+    }
+
+    private func refreshOpenAtLoginFromSystem() {
+        openAtLoginOn = LaunchAtLogin.isSetToOpenAtLogin
+        openAtLoginNeedsApproval = LaunchAtLogin.needsApprovalInSystemSettings
     }
 
     @ViewBuilder
@@ -711,7 +781,7 @@ private struct Argon2SettingsView: View {
 
                 SettingsCard {
                     VStack(spacing: 0) {
-                        Argon2Row(
+                        SettingsRow(
                             label: "Memory (KiB)",
                             description: "Memory cost. Default: 65,535",
                             value: $memoryKiB,
@@ -719,7 +789,7 @@ private struct Argon2SettingsView: View {
                             step: 1024
                         )
                         Divider().padding(.leading, 16)
-                        Argon2Row(
+                        SettingsRow(
                             label: "Iterations",
                             description: "Time cost (iterations). Default: 3",
                             value: $iterations,
@@ -727,7 +797,7 @@ private struct Argon2SettingsView: View {
                             step: 1
                         )
                         Divider().padding(.leading, 16)
-                        Argon2Row(
+                        SettingsRow(
                             label: "Parallelism",
                             description: "Parallelism (lanes). Default: 1",
                             value: $parallelism,
@@ -753,7 +823,7 @@ private struct Argon2SettingsView: View {
     }
 }
 
-private struct Argon2Row: View {
+private struct SettingsRow: View {
     let label: String
     let description: String
     @Binding var value: Int

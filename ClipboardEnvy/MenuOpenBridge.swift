@@ -512,7 +512,10 @@ enum MenuOpenBridge {
         applyVisibility(ofSection: .csv, in: menu, isVisible: context.showCSVSection)
         applyVisibility(ofSection: .tabPipeSeparated, in: menu, isVisible: context.showTSVPSVSection)
         applyVisibility(ofSection: .fixedWidthTable, in: menu, isVisible: context.showFixedWidthTableSection)
-        applyVisibility(ofSection: .columns, in: menu, isVisible: context.showColumnsSection)
+        // applyVisibility(ofSection: .columns, in: menu, isVisible: context.showColumnsSection)
+        if context.showColumnsSection {
+            revealColumnItemSubmenus(in: menu)
+        }
 
         applyVisibility([
             "→ JSON (typed)": context.showCSVSection,
@@ -525,13 +528,42 @@ enum MenuOpenBridge {
             "Table → CSV": context.showFixedWidthTableSection,
             "Table → JSON (typed)": context.showFixedWidthTableSection,
             "Table → JSON (strings)": context.showFixedWidthTableSection,
-            "Strip Empty Columns": context.showStripColumns
+            "Strip Empty Columns": context.showStripColumns,
+            "Columns": context.showColumnsSection
         ], in: menu)
 
-        for item in menu.items {
-            if item.isSeparatorItem {
-                item.isHidden = false
+        // Manage the standalone Divider that precedes "Strip Empty Columns". It is
+        // not part of a Section, so applyVisibility(ofSection:) won't reach it.
+        // We must target it explicitly to avoid leaving a phantom separator that
+        // shifts NSMenu's internal Y-position calculations for items below.
+        applyPrecedingSeparatorVisibility(before: "Strip Empty Columns", in: menu, isVisible: context.showStripColumns)
+    }
+
+    private static func applyPrecedingSeparatorVisibility(before itemTitle: String, in menu: NSMenu, isVisible: Bool) {
+        guard let idx = menu.items.firstIndex(where: { $0.title == itemTitle }),
+              idx > 0,
+              menu.items[idx - 1].isSeparatorItem else { return }
+        menu.items[idx - 1].isHidden = !isVisible
+    }
+
+    // The baseline-snapshot mechanism captures column item submenu contents as hidden when
+    // the Columns section is hidden. applyTransformOverrides re-hides them each cycle, but
+    // applyVisibility(ofSection:) only touches the top-level column items. We must
+    // explicitly reveal each column item's submenu so NSMenu shows the flyout.
+    private static func revealColumnItemSubmenus(in menu: NSMenu) {
+        guard let headerIndex = menu.items.firstIndex(where: {
+            TransformMenuTitles.stripSparkleSuffix($0.title) == TransformMenuTitles.Section.columns.rawValue
+        }) else { return }
+        var idx = headerIndex + 1
+        while idx < menu.items.count {
+            let item = menu.items[idx]
+            let itemName = TransformMenuTitles.stripSparkleSuffix(item.title)
+            if !item.isSeparatorItem,
+               TransformMenuTitles.Section(rawValue: itemName) != nil { break }
+            if let submenu = item.submenu {
+                revealAllItems(in: submenu)
             }
+            idx += 1
         }
     }
 
@@ -651,6 +683,17 @@ enum MenuOpenBridge {
         guard let sectionHeaderIndex = menu.items.firstIndex(where: {
             TransformMenuTitles.stripSparkleSuffix($0.title) == section.rawValue
         }) else { return }
+
+        // Also hide/show the separator that immediately precedes this section header,
+        // so phantom invisible separators don't skew NSMenu's internal Y-position
+        // calculations for all items below them.
+        if sectionHeaderIndex > 0 {
+            let preceding = menu.items[sectionHeaderIndex - 1]
+            if preceding.isSeparatorItem {
+                preceding.isHidden = !isVisible
+            }
+        }
+
         let sectionHeader = menu.items[sectionHeaderIndex]
         sectionHeader.isHidden = !isVisible
 
