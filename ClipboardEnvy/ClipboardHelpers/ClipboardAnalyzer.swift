@@ -221,7 +221,7 @@ enum ClipboardAnalyzer {
         }
 
         if let analysis = detectJWT(trimmed, original: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
-        if let analysis = detectURL(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
+        if let analysis = detectURL(trimmed, original: text, maxLineLen: maxLineLen) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         // Before Time: numeric-looking bit strings (e.g. `10101010`) must not be parsed as epoch values.
         if let analysis = detectBinaryValue(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
         if let analysis = detectTime(trimmed, original: text) { return finish(analysis, sourceText: text, maxLineLen: maxLineLen, previewMaxLines: previewMaxLines) }
@@ -375,7 +375,7 @@ enum ClipboardAnalyzer {
         return analysis
     }
 
-    private static func detectURL(_ trimmed: String, original: String) -> ClipboardAnalysis? {
+    private static func detectURL(_ trimmed: String, original: String, maxLineLen: Int) -> ClipboardAnalysis? {
         guard trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") else { return nil }
         let firstLine = trimmed.split(separator: "\n").first.map(String.init) ?? trimmed
         guard let url = URL(string: firstLine), url.host != nil else { return nil }
@@ -384,25 +384,25 @@ enum ClipboardAnalyzer {
         addTextMetrics(to: &analysis, text: original)
         analysis.set("Scheme", url.scheme ?? "")
         if let user = url.user, !user.isEmpty {
-            analysis.set("Username", user)
+            analysis.set("Username", truncateForMenuLabel(user, limit: maxLineLen))
             if let password = url.password, !password.isEmpty {
                 analysis.set("Password", "••••••••")
             }
         }
         if let host = url.host {
-            analysis.set("Host", host)
+            analysis.set("Host", truncateForMenuLabel(host, limit: maxLineLen))
         }
         if let port = url.port {
             analysis.set("Port", "\(port)")
         }
         if !url.path.isEmpty && url.path != "/" {
-            analysis.set("Path", url.path)
+            analysis.set("Path", truncateForMenuLabel(url.path, limit: maxLineLen))
         }
         if let query = url.query, !query.isEmpty {
             analysis.set("Query Params", "\(query.components(separatedBy: "&").count)")
         }
         if let fragment = url.fragment, !fragment.isEmpty {
-            analysis.set("Fragment", fragment)
+            analysis.set("Fragment", truncateForMenuLabel(fragment, limit: maxLineLen))
         }
 
         return analysis
