@@ -30,7 +30,6 @@ enum MenuOpenBridge {
     private static var optionMonitors: [Any] = []
     private static var optionPollTimer: Timer?
     private static var lastOptionVisibility: Bool?
-    private static var lastShiftVisibility: Bool?
     private static let testDataMenuTitle = TransformMenuTitles.testData
     private static let managedTransformSubmenuKeys = TransformMenuTitles.managedSubmenuKeys
     private static var transformSubmenusVisibleWithoutOption: Set<String> = []
@@ -76,7 +75,6 @@ enum MenuOpenBridge {
         applyTransformOverrides(in: menu, shouldShowAll: isOptionPressed)
 
         lastOptionVisibility = isOptionPressed
-        lastShiftVisibility = NSEvent.modifierFlags.contains(.shift)
         stopOptionPolling()
         stopOptionMonitor()
         startOptionPolling()
@@ -95,7 +93,6 @@ enum MenuOpenBridge {
         transformMenuLabelsContext = nil
         clearShowAllOverrideSnapshot()
         lastOptionVisibility = nil
-        lastShiftVisibility = nil
         trackingMenu = nil
     }
 
@@ -136,10 +133,8 @@ enum MenuOpenBridge {
             Task { @MainActor in
                 guard let trackedMenu = trackingMenu else { return }
                 let isOptionPressed = NSEvent.modifierFlags.contains(.option)
-                let isShiftPressed = NSEvent.modifierFlags.contains(.shift)
-                if isOptionPressed != lastOptionVisibility || isShiftPressed != lastShiftVisibility {
+                if isOptionPressed != lastOptionVisibility {
                     lastOptionVisibility = isOptionPressed
-                    lastShiftVisibility = isShiftPressed
                     applyTransformOverrides(in: trackedMenu, shouldShowAll: isOptionPressed)
                 }
             }
@@ -155,10 +150,8 @@ enum MenuOpenBridge {
             Task { @MainActor in
                 guard trackingMenu != nil else { return }
                 let isOptionPressed = event.modifierFlags.contains(.option)
-                let isShiftPressed = event.modifierFlags.contains(.shift)
-                if isOptionPressed != lastOptionVisibility || isShiftPressed != lastShiftVisibility {
+                if isOptionPressed != lastOptionVisibility {
                     lastOptionVisibility = isOptionPressed
-                    lastShiftVisibility = isShiftPressed
                     if let trackedMenu = trackingMenu {
                         applyTransformOverrides(in: trackedMenu, shouldShowAll: isOptionPressed)
                     }
@@ -183,7 +176,6 @@ enum MenuOpenBridge {
 
     private static func stopOptionMonitor() {
         lastOptionVisibility = nil
-        lastShiftVisibility = nil
         for monitor in optionMonitors {
             NSEvent.removeMonitor(monitor)
         }
@@ -311,17 +303,11 @@ enum MenuOpenBridge {
 
     private static func applyTransformMenuLabelUpdates(in menu: NSMenu, shouldShowAll: Bool) {
         guard let context = transformMenuLabelsContext else { return }
-        let shouldPasteAfterOperation = NSEvent.modifierFlags.contains(.shift)
         if let transformMenuItem = findTransformRootMenuItem(in: menu) {
-            transformMenuItem.title = transformRootTitle(
-                shouldShowAll: shouldShowAll,
-                shouldPasteAfterOperation: shouldPasteAfterOperation
-            )
+            transformMenuItem.title = TransformMenuTitles.transformRoot
         }
         if let setMenuItem = findSetRootMenuItem(in: menu) {
-            setMenuItem.title = shouldPasteAfterOperation
-                ? TransformMenuTitles.setRootPaste
-                : TransformMenuTitles.setRoot
+            setMenuItem.title = TransformMenuTitles.setRoot
         }
         guard let transformMenuItem = findTransformRootMenuItem(in: menu),
               let transformSubmenu = transformMenuItem.submenu else {
@@ -356,19 +342,6 @@ enum MenuOpenBridge {
                 )
             }
         }
-    }
-
-    private static func transformRootTitle(shouldShowAll: Bool, shouldPasteAfterOperation: Bool) -> String {
-        if shouldShowAll && shouldPasteAfterOperation {
-            return TransformMenuTitles.transformRootCopyPaste
-        }
-        if shouldShowAll {
-            return TransformMenuTitles.transformRootCopy
-        }
-        if shouldPasteAfterOperation {
-            return TransformMenuTitles.transformRootPaste
-        }
-        return TransformMenuTitles.transformRoot
     }
 
     private static func applyTransformItemVisibility(in menu: NSMenu, shouldShowAll: Bool, context: TransformMenuLabelsContext) {

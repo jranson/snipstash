@@ -577,14 +577,6 @@ private struct GeneralSettingsView: View {
                         )
                     }
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    tipRow(
-                        title: "Power User Tip  —  Auto-Copy & Auto-Paste",
-                        detail: "Try pressing ⌥ Option, ⇧ Shift, or ⌥ Option + ⇧ Shift while the \(BuildInfo.appName) menu is open for some cool power-ups!",
-                        bullet: "💡"
-                    )
-                }
             }
             .padding(.top, 12)
             .padding(.horizontal, 16)
@@ -634,28 +626,6 @@ private struct GeneralSettingsView: View {
     private func refreshOpenAtLoginFromSystem() {
         openAtLoginOn = LaunchAtLogin.isSetToOpenAtLogin
         openAtLoginNeedsApproval = LaunchAtLogin.needsApprovalInSystemSettings
-    }
-
-    @ViewBuilder
-    private func tipRow(title: String, detail: String, bullet: String = "") -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(bullet.isEmpty ? title : "\(bullet) \(title)")
-                .font(.system(size: 14.5, weight: .semibold))
-            Text(detail)
-                .font(.system(size: 14.5))
-                .foregroundStyle(.secondary)
-                .lineSpacing(5)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(8)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .secondarySystemFill).opacity(0.25))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
-        )
     }
 }
 

@@ -4,11 +4,7 @@ enum TransformMenuTitles {
     static let sparkleSuffix = " ✨"
     static let testData = "Test Data"
     static let transformRoot = "Transform Clipboard"
-    static let transformRootCopy = "Copy (⌘C) & Transform"
-    static let transformRootPaste = "Transform & Paste (⌘V)"
-    static let transformRootCopyPaste = "Copy (⌘C), Transform, Paste (⌘V)"
     static let setRoot = "Set Clipboard Text"
-    static let setRootPaste = "Set Clipboard & Paste (⌘V)"
     static let generalText = "General"
     static let time = "Time"
     static let urls = "URLs"
@@ -41,16 +37,8 @@ enum TransformMenuTitles {
     }
 
     static let managedSubmenuKeys: Set<String> = Set(ManagedSubmenu.allCases.map(\.rawValue))
-    static let allTransformRootTitles: Set<String> = [
-        transformRoot,
-        transformRootCopy,
-        transformRootPaste,
-        transformRootCopyPaste
-    ]
-    static let allSetRootTitles: Set<String> = [
-        setRoot,
-        setRootPaste
-    ]
+    static let allTransformRootTitles: Set<String> = [transformRoot]
+    static let allSetRootTitles: Set<String> = [setRoot]
 
     static func stripSparkleSuffix(_ title: String) -> String {
         title.replacingOccurrences(of: sparkleSuffix, with: "")
@@ -67,8 +55,6 @@ struct TransformMenuLabelVariant {
 }
 
 struct TransformMenuLabelsContext {
-    let transformRootTitle: String
-    let setRootTitle: String
     let generalText: TransformMenuLabelVariant
     let managedSubmenus: [String: TransformMenuLabelVariant]
     let showGeneralTextSplitJSONArray: Bool

@@ -21,7 +21,6 @@ struct MenuBarView: View {
 
     @State private var clipboardAnalysis = ClipboardAnalysis(dataType: .nonText)
     @State private var shouldShowAll = false
-    @State private var shouldPasteAfterOperation = false
     @State private var optionMonitors: [Any] = []
 
     private var snippets: [Snippet] { snippetsStore.snippets }
@@ -271,23 +270,6 @@ struct MenuBarView: View {
         databaseCLIMenuTitle()
     }
 
-    private var transformRootMenuLabel: String {
-        if shouldShowAll && shouldPasteAfterOperation {
-            return TransformMenuTitles.transformRootCopyPaste
-        }
-        if shouldShowAll {
-            return TransformMenuTitles.transformRootCopy
-        }
-        if shouldPasteAfterOperation {
-            return TransformMenuTitles.transformRootPaste
-        }
-        return TransformMenuTitles.transformRoot
-    }
-
-    private var setClipboardMenuLabel: String {
-        shouldPasteAfterOperation ? TransformMenuTitles.setRootPaste : TransformMenuTitles.setRoot
-    }
-
     private func databaseCLIMenuTitle() -> String {
         TransformMenuTitles.appendSparkleIf(
             TransformMenuTitles.databaseCLI,
@@ -343,8 +325,6 @@ struct MenuBarView: View {
         ]
 
         return TransformMenuLabelsContext(
-            transformRootTitle: transformRootMenuLabel,
-            setRootTitle: setClipboardMenuLabel,
             generalText: TransformMenuLabelVariant(
                 withoutOption: generalTextMenuTitle(shouldShowAll: false),
                 withOption: generalTextMenuTitle(shouldShowAll: true)
@@ -564,7 +544,7 @@ struct MenuBarView: View {
             }
         }
         if clipboardAnalysis.dataType != .nonText {
-            Menu(transformRootMenuLabel) {
+            Menu(TransformMenuTitles.transformRoot) {
                 Menu(generalTextMenuLabel) {
                 if isSimpleLiteralJsonArray {
                     Button(TransformMenuTitles.appendSparkleIf("Split JSON Array", condition: true)) {
@@ -1275,7 +1255,7 @@ struct MenuBarView: View {
             }
         }
         }
-        Menu(setClipboardMenuLabel) {
+        Menu(TransformMenuTitles.setRoot) {
             Menu("Time") {
                 Section("Sets Clipboard to Current Time") {
                     Divider()
@@ -1622,40 +1602,6 @@ struct MenuBarView: View {
 
     // MARK: - Actions
 
-    private struct ClipboardMenuModifiers {
-        let shouldCopyBeforeTransform: Bool
-        let shouldPasteAfterOperation: Bool
-
-        init(flags: NSEvent.ModifierFlags) {
-            shouldCopyBeforeTransform = flags.contains(.option)
-            shouldPasteAfterOperation = flags.contains(.shift)
-        }
-    }
-
-    private func currentMenuModifiers() -> ClipboardMenuModifiers {
-        ClipboardMenuModifiers(flags: NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags)
-    }
-
-    private func sendPasteKeystroke() {
-        do {
-            try KeyboardShortcut.commandV()
-        } catch {
-            #if DEBUG
-            print("[KeyboardShortcut] Paste failed: \(error)")
-            #endif
-        }
-    }
-
-    private func sendCopyKeystroke() {
-        do {
-            try KeyboardShortcut.commandC()
-        } catch {
-            #if DEBUG
-            print("[KeyboardShortcut] Copy failed: \(error)")
-            #endif
-        }
-    }
-
     private func quickSaveFromClipboard() {
         if let str = ClipboardIO.readString(), !str.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let snippet = Snippet(body: str, timestamp: Date())
@@ -1690,81 +1636,18 @@ struct MenuBarView: View {
     }
 
     private func transformClipboard(_ transform: @escaping (String) -> String) {
-        let modifiers = currentMenuModifiers()
-
-        if modifiers.shouldCopyBeforeTransform {
-            sendCopyKeystroke()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                let ok = ClipboardTransform.apply(transform, muted: muteSounds)
-                refreshClipboardAnalysis()
-                if ok, modifiers.shouldPasteAfterOperation {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                        sendPasteKeystroke()
-                    }
-                }
-            }
-            return
-        }
-
-        let ok = ClipboardTransform.apply(transform, muted: muteSounds)
+        _ = ClipboardTransform.apply(transform, muted: muteSounds)
         refreshClipboardAnalysis()
-        if ok, modifiers.shouldPasteAfterOperation {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                sendPasteKeystroke()
-            }
-        }
     }
 
     private func transformClipboardIfValid(_ transform: @escaping (String) -> String?) {
-        let modifiers = currentMenuModifiers()
-
-        if modifiers.shouldCopyBeforeTransform {
-            sendCopyKeystroke()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
-                refreshClipboardAnalysis()
-                if ok, modifiers.shouldPasteAfterOperation {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                        sendPasteKeystroke()
-                    }
-                }
-            }
-            return
-        }
-
-        let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+        _ = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
         refreshClipboardAnalysis()
-        if ok, modifiers.shouldPasteAfterOperation {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                sendPasteKeystroke()
-            }
-        }
     }
 
     private func transformClipboardIfValid(_ transform: @escaping (String) throws -> String) {
-        let modifiers = currentMenuModifiers()
-
-        if modifiers.shouldCopyBeforeTransform {
-            sendCopyKeystroke()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
-                refreshClipboardAnalysis()
-                if ok, modifiers.shouldPasteAfterOperation {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                        sendPasteKeystroke()
-                    }
-                }
-            }
-            return
-        }
-
-        let ok = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
+        _ = ClipboardTransform.applyIfValid(transform, muted: muteSounds)
         refreshClipboardAnalysis()
-        if ok, modifiers.shouldPasteAfterOperation {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                sendPasteKeystroke()
-            }
-        }
     }
 
     private func refreshClipboardAnalysis() {
@@ -1793,11 +1676,9 @@ struct MenuBarView: View {
 
     private func refreshOptionStatus(modifiers: NSEvent.ModifierFlags = NSEvent.modifierFlags) {
         let nextShouldShowAll = optionModifierIsPressed(modifierFlags: modifiers)
-        let nextShouldPasteAfterOperation = modifiers.contains(.shift)
-        if nextShouldShowAll != shouldShowAll || nextShouldPasteAfterOperation != shouldPasteAfterOperation {
-            print("[MenuBarView] refreshOptionStatus shouldShowAll=\(nextShouldShowAll) shouldPasteAfterOperation=\(nextShouldPasteAfterOperation)")
+        if nextShouldShowAll != shouldShowAll {
+            print("[MenuBarView] refreshOptionStatus shouldShowAll=\(nextShouldShowAll)")
             shouldShowAll = nextShouldShowAll
-            shouldPasteAfterOperation = nextShouldPasteAfterOperation
             if let trackedMenu = MenuOpenBridge.currentTrackingMenuIfAvailable() {
                 MenuOpenBridge.setTransformMenuContext(transformSubmenusVisibleWithoutOption())
                 MenuOpenBridge.setTransformMenuLabelsContext(transformMenuLabelsContext())
@@ -2032,11 +1913,6 @@ struct MenuBarView: View {
 
     private func setClipboardTo(_ string: String) {
         ClipboardSet.setAndNotify(string, muted: muteSounds)
-        if currentMenuModifiers().shouldPasteAfterOperation {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                sendPasteKeystroke()
-            }
-        }
     }
 
     private func confirmAndDelete(_ snippet: Snippet) {
@@ -2067,11 +1943,6 @@ struct MenuBarView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(snippet.body, forType: .string)
         ClipboardSound.playClipboardWritten(muted: muteSounds)
-        if currentMenuModifiers().shouldPasteAfterOperation {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                sendPasteKeystroke()
-            }
-        }
     }
 
     private func moveUp(_ snippet: Snippet) {
